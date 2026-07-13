@@ -12,6 +12,8 @@ import ErrorAlert from "../../components/common/ErrorAlert";
 import { formatTime, formatShortDate } from "../../utils/formatters";
 import { getDateInTimezone } from "../../utils/timezone";
 import { employeeService, type RecentActivity } from "../../services/employeeService";
+import { attendanceService } from "../../services/attendanceService";
+import type { BreakType } from "../../types/attendance";
 import type { CustomAxiosConfig } from "../../services/api";
 
 
@@ -23,6 +25,10 @@ const Dashboard: React.FC = () => {
   const user = useAppSelector((state) => state.auth.user);
   const { refreshTrigger } = useAppSelector((state) => state.notification);
   const [isClockOutModalOpen, setIsClockOutModalOpen] = useState(false);
+  const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
+  const [breakTypes, setBreakTypes] = useState<BreakType[]>([]);
+  const [selectedBreakTypeId, setSelectedBreakTypeId] = useState<string>("");
+  const [fetchingBreakTypes, setFetchingBreakTypes] = useState(false);
 
   const {
     status,
@@ -93,12 +99,32 @@ const Dashboard: React.FC = () => {
     }
   }, [actions, queryClient]);
 
+  const handleOpenBreakModal = async () => {
+    setIsBreakModalOpen(true);
+    if (breakTypes.length === 0) {
+      setFetchingBreakTypes(true);
+      try {
+        const resp = await attendanceService.getBreakTypes();
+        if (resp.status === "success") {
+          setBreakTypes(resp.data);
+          setSelectedBreakTypeId(""); // Always start with "Select break type"
+        }
+      } catch (err) {
+        console.error("Failed to fetch break types", err);
+      } finally {
+        setFetchingBreakTypes(false);
+      }
+    }
+  };
+
   const handleBreakStart = useCallback(async () => {
-    const success = await actions.breakStart();
+    if (!selectedBreakTypeId) return;
+    const success = await actions.breakStart(selectedBreakTypeId);
     if (success) {
+      setIsBreakModalOpen(false);
       queryClient.invalidateQueries({ queryKey: ["recent-activities"] });
     }
-  }, [actions, queryClient]);
+  }, [actions, queryClient, selectedBreakTypeId]);
 
   const handleBreakResume = useCallback(async () => {
     const success = await actions.breakResume();
@@ -148,8 +174,9 @@ const Dashboard: React.FC = () => {
         initialLoading={initialLoading}
         onClockIn={handleClockIn}
         onClockOut={() => setIsClockOutModalOpen(true)}
-        onBreakStart={handleBreakStart}
+        onBreakStart={handleOpenBreakModal}
         onBreakResume={handleBreakResume}
+        breakTypeName={attendanceData?.currentBreak?.breakType?.name}
         formatTime={formatTime}
       />
 
@@ -209,7 +236,7 @@ const Dashboard: React.FC = () => {
               </div>
             ) : activities.length > 0 ? (
               activities.map((activity, idx) => (
-                <div key={idx} className="flex gap-4 group">
+                <div key={idx} className="flex items-center gap-4 group">
                   <div className="relative">
                     <div
                       className={cn(
@@ -248,9 +275,11 @@ const Dashboard: React.FC = () => {
                         {formatTime(new Date(activity.timestamp))}
                       </span>
                     </div>
-                    <p className="text-sm text-foreground-secondary mt-0.5">
-                      {activity.description}
-                    </p>
+                    {activity.description && (
+                      <p className="text-sm text-foreground-secondary mt-0.5">
+                        {activity.description}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -328,6 +357,63 @@ const Dashboard: React.FC = () => {
         <p className="text-foreground-secondary">
           Are you sure you want to clock out? This will end your working session for today.
         </p>
+      </Modal>
+
+      <Modal
+        open={isBreakModalOpen}
+        onClose={() => setIsBreakModalOpen(false)}
+        title="Select Break Type"
+        maxWidth="sm"
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => setIsBreakModalOpen(false)} disabled={loading}>
+              Cancel
+            </Button>
+            <Button 
+              variant="default" 
+              onClick={handleBreakStart} 
+              disabled={loading || fetchingBreakTypes || !selectedBreakTypeId}
+              startIcon={loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Coffee className="w-4 h-4" />}
+            >
+              Start Break
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4 py-2">
+          <p className="text-sm text-foreground-secondary">
+            Please select the type of break you are taking.
+          </p>
+          
+          {fetchingBreakTypes ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <label htmlFor="breakType-dashboard" className="text-xs font-semibold uppercase tracking-wider text-foreground-secondary">
+                Break Type
+              </label>
+              <select
+                id="breakType-dashboard"
+                value={selectedBreakTypeId}
+                onChange={(e) => setSelectedBreakTypeId(e.target.value)}
+                className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+              >
+                <option value="" disabled>Select break type</option>
+                {breakTypes.length === 0 ? (
+                  <option value="" disabled>No break types available</option>
+                ) : (
+                  breakTypes.map((bt) => (
+                    <option key={bt._id} value={bt._id}>
+                      {bt.name} {bt.maxDuration > 0 ? `(${bt.maxDuration} mins max)` : ""}
+                    </option>
+                  ))
+                )}
+              </select>
+            </div>
+          )}
+        </div>
       </Modal>
 
     </div>

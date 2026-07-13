@@ -14,12 +14,13 @@ import {
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { logout } from "../../store/slices/authSlice";
 import { cn } from "../../lib/utils";
-import logoStatic from "../../assets/pulse-ops-logo.png";
+import logoStatic from "../../assets/codecit-logo.png";
 import { announcementService } from "../../services/announcementService";
 import { useSocket } from "../../hooks/useSocket";
 import { formatInTimezone } from "../../utils/timezone";
 import { setUnreadCount } from "../../store/slices/notificationSlice";
 import NotificationPermissionModal from "../features/notifications/NotificationPermissionModal";
+import LocationPermissionModal from "../features/location/LocationPermissionModal";
 import type { Announcement } from "../../types/announcement.types";
 
 interface HeaderNotification {
@@ -425,6 +426,7 @@ const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-surface border-b border-border shadow-sm">
       <NotificationPermissionModal />
+      <LocationPermissionModal />
       <div className="h-full px-4 md:px-6 flex items-center justify-between">
         {/* Left side - Logo & Branding */}
         <div className="flex items-center gap-3">
@@ -441,12 +443,12 @@ const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
           <div className="flex items-center gap-3">
             <img
               src={logoStatic}
-              alt="Pulse Ops"
+              alt="CodecIT"
               className="w-10 h-10 rounded-xl shadow-sm"
             />
             <div className="hidden sm:block">
               <h1 className="text-lg font-bold text-foreground leading-tight">
-                Pulse Ops
+                CodecIT
               </h1>
               <p className="text-xs text-foreground-secondary">
                 HR Management System

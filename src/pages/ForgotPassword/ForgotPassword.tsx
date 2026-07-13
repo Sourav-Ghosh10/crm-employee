@@ -5,8 +5,8 @@ import * as yup from "yup";
 import { Mail, ArrowLeft, Loader2, CheckCircle, KeyRound, Lock, Eye, EyeOff, AlertCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { cn } from "../../lib/utils";
-import logoAnimated from "../../assets/pulse-ops-logo-animated.mp4";
-import logoStatic from "../../assets/pulse-ops-logo.png";
+// import logoAnimated from "../../assets/pulse-ops-logo-animated.mp4";
+import logoStatic from "../../assets/codecit-logo.png";
 import { authService } from "../../services/authService";
 
 // Validation Schemas
@@ -160,7 +160,7 @@ const ForgotPassword: React.FC = () => {
                     <div className="max-w-md text-center">
                         <div className="mb-8">
                             <div className="w-40 h-40 mx-auto mb-6 rounded-3xl overflow-hidden bg-white/10 backdrop-blur-sm p-2">
-                                <video
+                                {/* <video
                                     autoPlay
                                     loop
                                     muted
@@ -168,10 +168,15 @@ const ForgotPassword: React.FC = () => {
                                     className="w-full h-full object-contain rounded-2xl"
                                 >
                                     <source src={logoAnimated} type="video/mp4" />
-                                    <img src={logoStatic} alt="Pulse Ops Logo" className="w-full h-full object-contain" />
-                                </video>
+                                    <img src={logoStatic} alt="CodecIT Logo" className="w-full h-full object-contain" />
+                                </video> */}
+                                <img
+                                    src={logoStatic}
+                                    alt="CodecIT Logo"
+                                    className="w-full h-full object-cover"
+                                />
                             </div>
-                            <h1 className="text-4xl font-bold mb-2">Pulse Ops</h1>
+                            <h1 className="text-4xl font-bold mb-2">CodecIT</h1>
                             <p className="text-white/80 text-lg">Human Resource Management</p>
                         </div>
                         <p className="text-white/70">
@@ -187,9 +192,9 @@ const ForgotPassword: React.FC = () => {
                     {/* Mobile Logo */}
                     <div className="lg:hidden text-center mb-8">
                         <div className="w-24 h-24 mx-auto mb-4 rounded-2xl overflow-hidden shadow-lg">
-                            <img src={logoStatic} alt="Pulse Ops Logo" className="w-full h-full object-cover" />
+                            <img src={logoStatic} alt="CodecIT Logo" className="w-full h-full object-cover" />
                         </div>
-                        <h1 className="text-2xl font-bold text-primary">Pulse Ops</h1>
+                        <h1 className="text-2xl font-bold text-primary">CodecIT</h1>
                     </div>
 
                     <Link to="/login" className="inline-flex items-center text-sm text-foreground-tertiary hover:text-primary transition-colors mb-6">

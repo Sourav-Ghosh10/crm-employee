@@ -9,8 +9,8 @@ import { useNavigate, useLocation, Link } from "react-router-dom";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { login, clearError, setError, loginWithGoogle } from "../../store/slices/authSlice";
 import { cn } from "../../lib/utils";
-import logoAnimated from "../../assets/pulse-ops-logo-animated.mp4";
-import logoStatic from "../../assets/pulse-ops-logo.png";
+// import logoAnimated from "../../assets/pulse-ops-logo-animated.mp4";
+import logoStatic from "../../assets/codecit-logo.png";
 
 const loginSchema = yup.object({
   email: yup
@@ -103,7 +103,7 @@ const Login: React.FC = () => {
             {/* Animated Logo */}
             <div className="mb-8">
               <div className="w-40 h-40 mx-auto mb-6 rounded-3xl overflow-hidden bg-white/10 backdrop-blur-sm p-2">
-                <video
+                {/* <video
                   autoPlay
                   loop
                   muted
@@ -113,12 +113,17 @@ const Login: React.FC = () => {
                   <source src={logoAnimated} type="video/mp4" />
                   <img
                     src={logoStatic}
-                    alt="Pulse Ops Logo"
+                    alt="CodecIT Logo"
                     className="w-full h-full object-contain"
                   />
-                </video>
+                </video> */}
+                <img
+                src={logoStatic}
+                alt="CodecIT Logo"
+                className="w-full h-full object-cover"
+              />
               </div>
-              <h1 className="text-4xl font-bold mb-2">Pulse Ops</h1>
+              <h1 className="text-4xl font-bold mb-2">CodecIT</h1>
               <p className="text-white/80 text-lg">Human Resource Management</p>
             </div>
 
@@ -208,11 +213,11 @@ const Login: React.FC = () => {
             <div className="w-24 h-24 mx-auto mb-4 rounded-2xl overflow-hidden shadow-lg">
               <img
                 src={logoStatic}
-                alt="Pulse Ops Logo"
+                alt="CodecIT Logo"
                 className="w-full h-full object-cover"
               />
             </div>
-            <h1 className="text-2xl font-bold text-primary">Pulse Ops</h1>
+            <h1 className="text-2xl font-bold text-primary">CodecIT</h1>
           </div>
 
           {/* Welcome Text */}
@@ -256,7 +261,7 @@ const Login: React.FC = () => {
                       id="email"
                       type="email"
                       autoComplete="email"
-                      placeholder="employee@pulseops.com"
+                      placeholder="employee@codecit.com"
                       className={cn(
                         "w-full pl-12 pr-4 py-3.5 border rounded-xl transition-all duration-200",
                         "focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent",
@@ -448,7 +453,7 @@ const Login: React.FC = () => {
 
           {/* Footer */}
           <p className="mt-8 text-center text-sm text-foreground-tertiary">
-            &copy; {new Date().getFullYear()} Pulse Ops. All rights reserved.
+            &copy; {new Date().getFullYear()} CodecIT. All rights reserved.
           </p>
         </div>
       </div>

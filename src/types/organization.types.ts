@@ -18,6 +18,43 @@ export interface Designation {
     updatedAt?: string;
 }
 
+
+export interface OfficeLocation {
+    _id: string;
+    name: string;
+    address: {
+        street: string;
+        city: string;
+        state: string;
+        country: string;
+        zipCode: string;
+    };
+    contactInfo: {
+        phone?: string;
+        email?: string;
+    };
+    isHeadquarters: boolean;
+    isActive: boolean;
+}
+
+export interface OfficeLocation {
+    _id: string;
+    name: string;
+    address: {
+        street: string;
+        city: string;
+        state: string;
+        country: string;
+        zipCode: string;
+    };
+    contactInfo: {
+        phone?: string;
+        email?: string;
+    };
+    isHeadquarters: boolean;
+    isActive: boolean;
+}
+
 export interface OrganizationResponse<T> {
     success: boolean;
     data: T[];

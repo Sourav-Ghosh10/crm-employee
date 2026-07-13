@@ -3,6 +3,9 @@ export type AttendanceStatus = "clock_in" | "clock_out" | "break_start" | "break
 export interface AttendanceActionTime {
     time: string;
     ipAddress?: string;
+    latitude?: number;
+    longitude?: number;
+    address?: string;
 }
 
 export interface AttendanceSession {
@@ -27,10 +30,19 @@ export interface IncompleteShift {
 }
 
 
+export interface AttendanceBreak {
+    startTime: string;
+    endTime?: string;
+    breakType?: BreakType;
+    duration?: number;
+    durationString?: string;
+}
+
 export interface AttendanceStatusResponse {
     isClockedIn: boolean;
     isOnBreak?: boolean;
     currentSession?: AttendanceSession;
+    currentBreak?: AttendanceBreak;
     totalSessions?: number;
     totalBreakCount?: number;
     totalHours?: number;
@@ -68,3 +80,13 @@ export interface AttendanceRecord {
     durationMs?: number;
 }
 
+
+export interface BreakType {
+    _id: string;
+    name: string;
+    code: string;
+    description?: string;
+    maxDuration: number;
+    isPaid?: boolean;
+    isActive: boolean;
+}

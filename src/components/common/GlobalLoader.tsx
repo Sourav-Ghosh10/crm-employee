@@ -21,7 +21,7 @@ const GlobalLoader: React.FC = () => {
 
     return (
         <div className={cn(
-            "fixed z-[9999] flex items-center justify-center bg-background/60 backdrop-blur-md transition-all animate-in",
+            "fixed z-[9999] flex items-center justify-center bg-background/60 transition-all animate-in",
             "top-[64px] left-0 right-0 bottom-0 md:left-[260px]"
         )}>
             <div className="flex flex-col items-center gap-4 p-8 rounded-3xl bg-surface shadow-2xl border border-border/50">
@@ -33,7 +33,7 @@ const GlobalLoader: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col items-center">
-                    <h3 className="text-lg font-bold text-foreground tracking-tight">Pulse Ops</h3>
+                    <h3 className="text-lg font-bold text-foreground tracking-tight">CodecIT</h3>
                     <div className="flex items-center gap-1 mt-1">
                         <span className="text-xs text-foreground-secondary font-medium">Processing</span>
                         <span className="flex gap-0.5">

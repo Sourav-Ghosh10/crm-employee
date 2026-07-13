@@ -11,7 +11,7 @@ import {
 } from "../store/slices/notificationSlice";
 import { toast } from "react-hot-toast";
 import React from "react";
-import logoStatic from "../assets/pulse-ops-logo.png";
+import logoStatic from "../assets/codecit-logo.png";
 import { type MessagePayload } from "firebase/messaging";
 
 export const useSocket = () => {

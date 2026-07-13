@@ -1,4 +1,4 @@
-// Theme constants for Pulse Ops
+// Theme constants for CodecIT
 // These values mirror what's defined in global.css @theme
 // Use these for any programmatic access to theme values
 

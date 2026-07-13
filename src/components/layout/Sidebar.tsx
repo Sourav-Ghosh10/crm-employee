@@ -9,6 +9,7 @@ import {
   User,
   // Settings,
   Receipt,
+  Banknote,
   // Bell,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
@@ -28,6 +29,7 @@ const menuItems = [
   { text: "Schedule", icon: Calendar, path: "/schedule" },
   { text: "Leave", icon: FileText, path: "/leave" },
   { text: "Reimbursements", icon: Receipt, path: "/reimbursements" },
+  { text: "Payroll", icon: Banknote, path: "/payroll" },
   { text: "My Profile", icon: User, path: "/profile" },
   // { text: "Settings", icon: Settings, path: "/settings" },
 ];
@@ -75,7 +77,7 @@ const Sidebar: React.FC<SidebarProps> = ({
       {/* Footer */}
       <div className="p-4 border-t border-white/10">
         <p className="text-xs text-white/40 text-center">
-          &copy; {new Date().getFullYear()} Pulse Ops
+          &copy; {new Date().getFullYear()} CodecIT
         </p>
       </div>
     </div>

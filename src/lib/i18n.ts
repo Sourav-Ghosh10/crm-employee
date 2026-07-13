@@ -17,6 +17,9 @@ i18n
     .init({
         fallbackLng: 'en',
         debug: true,
+        backend: {
+            loadPath: `${(import.meta.env.VITE_PUBLIC_URL || '').replace(/\/$/, '')}/locales/{{lng}}/{{ns}}.json`,
+        },
 
         interpolation: {
             escapeValue: false, // not needed for react as it escapes by default

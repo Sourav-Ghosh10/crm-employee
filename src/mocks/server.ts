@@ -25,7 +25,7 @@ interface StoredToken {
 
 // Hardcoded credentials for demo
 const DEMO_CREDENTIALS = {
-  email: "admin@pulseops.com",
+  email: "admin@codecit.com",
   password: "Admin@123",
 };
 
@@ -49,7 +49,7 @@ const usersDb: User[] = [
   },
   {
     id: "2",
-    email: "john.doe@pulseops.com",
+    email: "john.doe@codecit.com",
     password: "John@123",
     firstName: "John",
     lastName: "Doe",
@@ -62,7 +62,7 @@ const usersDb: User[] = [
   },
   {
     id: "3",
-    email: "jane.smith@pulseops.com",
+    email: "jane.smith@codecit.com",
     password: "Jane@123",
     firstName: "Jane",
     lastName: "Smith",

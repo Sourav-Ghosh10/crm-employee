@@ -28,6 +28,8 @@ import Modal from "../../components/common/Modal";
 import LoadingSpinner from "../../components/common/LoadingSpinner";
 import EmptyState from "../../components/common/EmptyState";
 import { cn } from "../../lib/utils";
+import LeaveCalendarView from "../../components/features/leave/LeaveCalendarView";
+import LeaveModalCalendarPicker from "../../components/features/leave/LeaveModalCalendarPicker";
 import leaveService from "../../services/leaveService";
 import type {
   LeaveType,
@@ -76,9 +78,10 @@ const getLeaveTypeClass = (type: string | LeaveType) => {
 const Leave: React.FC = () => {
   const queryClient = useQueryClient();
 
-  // Filter state
+  // Filter & View state
   const [statusFilter, setStatusFilter] = useState<LeaveStatus | "all">("all");
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("calendar");
 
   // Leave Requests Query
   const {
@@ -155,7 +158,7 @@ const Leave: React.FC = () => {
       }
       return [];
     },
-    staleTime: 60 * 60 * 1000, // 1 hour
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   // Modal state
@@ -245,22 +248,23 @@ const Leave: React.FC = () => {
     resetForm();
   };
 
-  const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newStartDate = e.target.value;
-    setStartDate(newStartDate);
-
-    if (fieldErrors.startDate) {
-      setFieldErrors(prev => {
-        const { startDate: _, ...rest } = prev;
-        return rest;
-      });
-    }
-
-    // If end date exists and is before start date, reset end date
-    if (endDate && newStartDate > endDate) {
-      setEndDate("");
-    }
-  };
+  // Unused since date selection is handled directly by LeaveModalCalendarPicker
+  // const handleStartDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  //   const newStartDate = e.target.value;
+  //   setStartDate(newStartDate);
+  //
+  //   if (fieldErrors.startDate) {
+  //     setFieldErrors(prev => {
+  //       const { startDate: _, ...rest } = prev;
+  //       return rest;
+  //     });
+  //   }
+  //
+  //   // If end date exists and is before start date, reset end date
+  //   if (endDate && newStartDate > endDate) {
+  //     setEndDate("");
+  //   }
+  // };
 
   // Unused handlers - commenting out to avoid lint errors
   // const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -452,10 +456,11 @@ const Leave: React.FC = () => {
 
   const requestedDays = apiCalculatedDays;
   const selectedTypeBalance = getBalanceForType(leaveType);
-  const hasInsufficientBalance =
-    selectedTypeBalance &&
-    selectedTypeBalance.currentBalance !== null &&
-    requestedDays > selectedTypeBalance.currentBalance;
+  const isSelectedTypePaid = selectedTypeBalance?.isPaid !== false && leaveType !== "unpaid";
+
+  const hasInsufficientBalance = isSelectedTypePaid
+    ? requestedDays > (balanceData?.globalAvailableBalance ?? 0)
+    : false;
 
   const isSubmitDisabled =
     isSubmitting ||
@@ -481,11 +486,24 @@ const Leave: React.FC = () => {
               queryClient.invalidateQueries({ queryKey: ["leave-balance"] });
               queryClient.invalidateQueries({ queryKey: ["leave-requests"] });
               queryClient.invalidateQueries({ queryKey: ["leave-stats"] });
+              queryClient.invalidateQueries({ queryKey: ["leave-metadata"] });
             }}
             className="bg-surface/50 backdrop-blur-sm border-white/20 text-foreground hover:bg-white/20"
             startIcon={<RefreshCw className="w-4 h-4" />}
           >
             Refresh
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => {
+              setViewMode(prev => prev === "calendar" ? "list" : "calendar");
+              const element = document.getElementById("leave-requests-section");
+              if (element) element.scrollIntoView({ behavior: "smooth" });
+            }}
+            className="bg-surface/50 backdrop-blur-sm border-white/20 text-foreground hover:bg-white/20"
+            startIcon={viewMode === "calendar" ? <FileText className="w-4 h-4" /> : <Calendar className="w-4 h-4" />}
+          >
+            {viewMode === "calendar" ? "List View" : "Calendar View"}
           </Button>
           <Button
             onClick={() => setIsModalOpen(true)}
@@ -626,7 +644,7 @@ const Leave: React.FC = () => {
                       return false;
                     })
                     .map((balance: UserLeaveBalance) => {
-                      const isFaded = balance.isPaid !== false && (balance.currentBalance ?? 0) <= 0;
+                      const isFaded = balance.isPaid !== false && (balanceData?.globalAvailableBalance ?? 0) <= 0;
                       return (
                         <div
                           key={balance.code}
@@ -662,7 +680,7 @@ const Leave: React.FC = () => {
                                 "font-semibold text-foreground",
                                 balance.isPaid === false && "ml-auto"
                               )}>
-                                {balance.isPaid === false ? "No Limit" : (balance.currentBalance ?? "-")}
+                                {balance.isPaid === false ? "No Limit" : "Shared Pool"}
                               </span>
                             </div>
                             {balance.isPaid !== false && (
@@ -673,7 +691,7 @@ const Leave: React.FC = () => {
                                     getLeaveTypeClass(balance.name).split(' ')[1].replace('text-', 'bg-')
                                   )}
                                   style={{
-                                    width: `${(balance.totalAllocated ?? 0) > 0 ? ((balance.used ?? 0) / (balance.totalAllocated ?? 0)) * 100 : 0}%`,
+                                    width: `${(balanceData?.totalLeaveBalance ?? 0) > 0 ? ((balance.used ?? 0) / (balanceData.totalLeaveBalance ?? 0)) * 100 : 0}%`,
                                   }}
                                 />
                               </div>
@@ -681,7 +699,7 @@ const Leave: React.FC = () => {
                             <div className="flex justify-between text-xs text-foreground-tertiary">
                               <span>Used: {balance.used ?? 0}</span>
                               {balance.isPaid !== false && (
-                                <span>Total: {balance.totalAllocated ?? "-"}</span>
+                                <span>Total: {balanceData?.totalLeaveBalance ?? "-"}</span>
                               )}
                             </div>
                           </div>
@@ -697,10 +715,61 @@ const Leave: React.FC = () => {
 
       {/* Bottom Grid: Requests and Organization Policies */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          {/* My Requests List */}
-          <Card
-            title="My Requests"
+        <div id="leave-requests-section" className="lg:col-span-2 space-y-4">
+          {/* View Mode Switcher */}
+          <div className="flex items-center justify-between bg-surface border border-border p-1.5 rounded-2xl shadow-sm">
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setViewMode("calendar")}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2",
+                  viewMode === "calendar"
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                    : "text-foreground-secondary hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Leave Calendar</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("list")}
+                className={cn(
+                  "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2",
+                  viewMode === "list"
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                    : "text-foreground-secondary hover:text-foreground hover:bg-muted/50"
+                )}
+              >
+                <FileText className="w-4 h-4" />
+                <span>My Requests List</span>
+              </button>
+            </div>
+            <div className="text-xs text-foreground-secondary hidden sm:block pr-2 font-medium">
+              {viewMode === "calendar" ? "Click any date to apply" : `${requests.length} total requests`}
+            </div>
+          </div>
+
+          {viewMode === "calendar" ? (
+            <LeaveCalendarView
+              requests={requests}
+              onSelectDateToApply={(dateStr) => {
+                setStartDate(dateStr);
+                setEndDate(dateStr);
+                setIsHalfDay(false);
+                if (fieldErrors.startDate || fieldErrors.endDate) {
+                  setFieldErrors(prev => {
+                    const { startDate: _, endDate: __, ...rest } = prev;
+                    return rest;
+                  });
+                }
+                setIsModalOpen(true);
+              }}
+            />
+          ) : (
+            <Card
+              title="My Requests"
             action={
               <div className="flex items-center gap-2">
                 <div className="relative">
@@ -834,6 +903,7 @@ const Leave: React.FC = () => {
               </div>
             )}
           </Card>
+          )}
         </div>
 
         <div className="lg:col-span-1 space-y-6">
@@ -985,14 +1055,14 @@ const Leave: React.FC = () => {
                     apiLeaveTypes.map((type) => {
                       // Note: We're mapping the dynamic type name/code to our existing LeaveType enum where possible
                       // or just using the dynamic data. For now, let's use the dynamic name.
-                      const balance = balanceData?.balances?.find(b => {
-                        const bTypeName = b.name || "";
-                        const typeName = type.name || "";
-                        return bTypeName.toLowerCase().replace(" leave", "") === typeName.toLowerCase().replace(" leave", "");
-                      });
+                      // const balance = balanceData?.balances?.find(b => {
+                      //   const bTypeName = b.name || "";
+                      //   const typeName = type.name || "";
+                      //   return bTypeName.toLowerCase().replace(" leave", "") === typeName.toLowerCase().replace(" leave", "");
+                      // });
 
                       const isSelected = leaveType === type.name;
-                      const isDisabled = type.isPaid !== false && (!balance || (balance.currentBalance ?? 0) <= 0);
+                      const isDisabled = type.isPaid !== false && (balanceData?.globalAvailableBalance ?? 0) <= 0;
 
                       return (
                         <button
@@ -1001,6 +1071,11 @@ const Leave: React.FC = () => {
                           disabled={isDisabled}
                           onClick={() => {
                             setLeaveType(type.name as LeaveType);
+                            const todayStr = new Date().toISOString().split('T')[0];
+                            if (type.allowPastDates === false && (startDate < todayStr || endDate < todayStr)) {
+                              setStartDate("");
+                              setEndDate("");
+                            }
                             if (fieldErrors.leaveType) {
                               setFieldErrors(prev => {
                                 const { leaveType: _, ...rest } = prev;
@@ -1027,11 +1102,7 @@ const Leave: React.FC = () => {
                           <p className="text-sm font-medium text-foreground truncate">
                             {type.name.replace(" Leave", "")}
                           </p>
-                          {balance && type.isPaid !== false && (
-                            <p className="text-xs text-foreground-tertiary">
-                              {balance.currentBalance ?? 0} available
-                            </p>
-                          )}
+
                           {type.isPaid === false && (
                             <p className="text-xs text-info font-medium">
                               No Limit
@@ -1043,9 +1114,9 @@ const Leave: React.FC = () => {
                   ) : (
                     // Fallback to static if API hasn't returned yet
                     (Object.keys(leaveTypeLabels) as LeaveType[]).slice(0, 4).map((type) => {
-                      const balance = getBalanceForType(type);
+                      // const balance = getBalanceForType(type);
                       const isUnpaid = type === 'unpaid';
-                      const isDisabled = !isUnpaid && (!balance || (balance.currentBalance ?? 0) <= 0);
+                      const isDisabled = !isUnpaid && (balanceData?.globalAvailableBalance ?? 0) <= 0;
 
                       return (
                         <button
@@ -1080,11 +1151,7 @@ const Leave: React.FC = () => {
                           <p className="text-sm font-medium text-foreground">
                             {leaveTypeLabels[type].replace(" Leave", "")}
                           </p>
-                          {balance && type !== 'unpaid' && (
-                            <p className="text-xs text-foreground-tertiary">
-                              {balance.currentBalance ?? 0} available
-                            </p>
-                          )}
+
                           {type === 'unpaid' && (
                             <p className="text-xs text-info font-medium">
                               No Limit
@@ -1101,6 +1168,12 @@ const Leave: React.FC = () => {
               </div>
 
               {/* Half Day Toggle */}
+              <div className="mt-6 mb-2">
+                <p className="text-sm font-bold text-primary flex items-center gap-2">
+                  <Briefcase className="w-4 h-4" />
+                  Available Leave: {balanceData?.globalAvailableBalance ?? 0} days
+                </p>
+              </div>
               <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
                 <div className="flex items-center gap-3">
                   <input
@@ -1155,66 +1228,41 @@ const Leave: React.FC = () => {
                 )}
               </div>
 
-              {/* Date Selection */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className={cn(isHalfDay && "sm:col-span-2")}>
-                  <label className="text-sm font-medium text-foreground mb-1.5 block">
-                    {isHalfDay ? "Date" : "Start Date"} <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="date"
-                    value={startDate}
-                    onChange={handleStartDateChange}
-                    min={new Date().toISOString().split("T")[0]}
-                    className={cn(
-                      "w-full px-4 py-2.5 border rounded-xl bg-surface text-foreground focus:ring-2 focus:ring-primary focus:border-transparent",
-                      fieldErrors.startDate ? "border-error" : "border-border"
-                    )}
-                  />
-                  {fieldErrors.startDate && (
-                    <p className="text-xs text-error mt-1">{fieldErrors.startDate}</p>
-                  )}
-                </div>
-
-                {!isHalfDay && (
-                  <div>
-                    <label className="text-sm font-medium text-foreground mb-1.5 block">
-                      End Date <span className="text-error">*</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      min={startDate}
-                      disabled={!startDate}
-                      onChange={(e) => {
-                        setEndDate(e.target.value);
-                        if (fieldErrors.endDate) {
+              {/* Interactive Modal Calendar Picker */}
+              <div>
+                {(() => {
+                  const selectedTypeObj = apiLeaveTypes.find(
+                    t => t.name === leaveType || t.code === leaveType || t.name.toLowerCase().replace(" leave", "") === (leaveType || "").toLowerCase().replace(" leave", "")
+                  );
+                  const allowPastDates = selectedTypeObj ? selectedTypeObj.allowPastDates !== false : true;
+                  return (
+                    <LeaveModalCalendarPicker
+                      startDate={startDate}
+                      endDate={endDate}
+                      isHalfDay={isHalfDay}
+                      allowPastDates={allowPastDates}
+                      onSelectRange={(start, end) => {
+                        setStartDate(start);
+                        setEndDate(end);
+                        if (fieldErrors.startDate || fieldErrors.endDate) {
                           setFieldErrors(prev => {
-                            const { endDate: _, ...rest } = prev;
+                            const { startDate: _, endDate: __, ...rest } = prev;
                             return rest;
                           });
                         }
                       }}
-                      className={cn(
-                        "w-full px-4 py-2.5 border rounded-xl bg-surface text-foreground focus:ring-2 focus:ring-primary focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed",
-                        fieldErrors.endDate ? "border-error" : "border-border"
-                      )}
                     />
-                    {fieldErrors.endDate && (
-                      <p className="text-xs text-error mt-1">{fieldErrors.endDate}</p>
-                    )}
-                    {startDate && !endDate && !fieldErrors.endDate && (
-                      <p className="text-xs text-foreground-tertiary mt-1">
-                        Select a date on or after{" "}
-                        {new Date(startDate).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
+                  );
+                })()}
+                {(fieldErrors.startDate || fieldErrors.endDate) && (
+                  <p className="text-xs text-error mt-2 ml-1">
+                    {fieldErrors.startDate || fieldErrors.endDate}
+                  </p>
                 )}
               </div>
 
               {/* Days Summary */}
-              {(requestedDays > 0 || isCalculatingDays || calculationError || dayBreakdown.length > 0) && (
+              {(startDate && (isHalfDay || endDate)) && (
                 <div
                   className={cn(
                     "p-4 rounded-xl border transition-all space-y-3",
@@ -1244,7 +1292,7 @@ const Leave: React.FC = () => {
                             <p className="text-xs text-foreground-secondary mt-0.5">
                               {selectedTypeBalance.isPaid === false
                                 ? "No limit for Unpaid Leave"
-                                : `${selectedTypeBalance.currentBalance ?? 0} days available for ${selectedTypeBalance.name}`}
+                                : `${balanceData?.globalAvailableBalance ?? 0} days available in shared balance`}
                             </p>
                           )}
                         </>

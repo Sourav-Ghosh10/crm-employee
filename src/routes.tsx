@@ -18,6 +18,7 @@ const Reimbursement = lazy(() => import("./pages/Reimbursement"));
 const Login = lazy(() => import("./pages/Login"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const Announcements = lazy(() => import("./pages/Announcements"));
+const Payroll = lazy(() => import("./pages/Payroll"));
 
 const Loading = () => <LoadingSpinner fullScreen />;
 
@@ -114,6 +115,14 @@ const router = createBrowserRouter([
         ),
       },
       {
+        path: "payroll",
+        element: (
+          <Suspense fallback={<Loading />}>
+            <Payroll />
+          </Suspense>
+        ),
+      },
+      {
         path: "*",
         element: (
           <div className="p-8 text-center">
@@ -144,7 +153,9 @@ const router = createBrowserRouter([
       </Suspense>
     ),
   },
-]);
+], {
+  basename: import.meta.env.VITE_PUBLIC_URL || "/",
+});
 
 const AppRoutes: React.FC = () => {
   return <RouterProvider router={router} />;

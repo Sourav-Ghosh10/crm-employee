@@ -1,4 +1,5 @@
 import React, { forwardRef } from "react";
+import { Loader2 } from "lucide-react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../../lib/utils";
 
@@ -37,6 +38,7 @@ export interface ButtonProps
   startIcon?: React.ReactNode;
   endIcon?: React.ReactNode;
   fullWidth?: boolean;
+  loading?: boolean;
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(
@@ -48,6 +50,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       startIcon,
       endIcon,
       fullWidth,
+      loading,
       children,
       ...props
     },
@@ -63,7 +66,11 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         {...props}
       >
-        {startIcon && <span className="shrink-0">{startIcon}</span>}
+        {loading ? (
+          <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+        ) : (
+          startIcon && <span className="shrink-0">{startIcon}</span>
+        )}
         {children}
         {endIcon && <span className="shrink-0">{endIcon}</span>}
       </button>

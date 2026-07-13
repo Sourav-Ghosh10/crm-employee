@@ -10,6 +10,7 @@ interface AttendanceHeroProps {
     lastActionTime: Date | null;
     workingHoursFormatted: string;
     breakDurationFormatted?: string;
+    breakTypeName?: string;
     loading: boolean;
     initialLoading: boolean;
     onClockIn: () => void;
@@ -25,6 +26,7 @@ const AttendanceHero: React.FC<AttendanceHeroProps> = ({
     lastActionTime,
     workingHoursFormatted,
     breakDurationFormatted,
+    breakTypeName,
     loading,
     initialLoading,
     onClockIn,
@@ -108,10 +110,14 @@ const AttendanceHero: React.FC<AttendanceHeroProps> = ({
                             </>
                         ) : (
                             <>
-                                <p className="text-white/70 text-xs sm:text-sm uppercase tracking-wider font-medium">Current Time</p>
-                                <p className="text-4xl sm:text-6xl font-bold tracking-tight font-mono">
-                                    {formatTime(currentTime)}
-                                </p>
+                                <div className="flex flex-col items-center lg:items-start group">
+                                    <p className="text-4xl sm:text-6xl font-bold tracking-tight font-mono">
+                                        {formatTime(currentTime)}
+                                    </p>
+                                    <p className="text-white/40 text-[10px] uppercase tracking-[0.2em] font-medium mt-1 group-hover:text-white/60 transition-colors">
+                                        {Intl.DateTimeFormat().resolvedOptions().timeZone.replace('_', ' ')}
+                                    </p>
+                                </div>
                                 {lastActionTime && status === "clock_out" && (
                                     <p className="text-white/60 text-xs sm:text-sm mt-2">
                                         Last Shift Ended: {formatTime(lastActionTime)}
@@ -125,7 +131,9 @@ const AttendanceHero: React.FC<AttendanceHeroProps> = ({
                                 <div className="flex items-center gap-3 animate-pulse">
                                     <Coffee className="w-5 h-5 text-warning/90" />
                                     <div>
-                                        <p className="text-xs uppercase tracking-wider opacity-80 text-warning/90 font-bold">Break Timer</p>
+                                        <p className="text-xs uppercase tracking-wider opacity-80 text-warning/90 font-bold">
+                                            {breakTypeName ? `${breakTypeName} Timer` : "Break Timer"}
+                                        </p>
                                         <p className="text-2xl font-mono font-bold text-white">{breakDurationFormatted}</p>
                                     </div>
                                 </div>

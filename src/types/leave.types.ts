@@ -43,6 +43,8 @@ export interface LeaveBalanceResponse {
     name: string;
     department: string;
     balances: UserLeaveBalance[];
+    globalAvailableBalance?: number;
+    totalLeaveBalance?: number;
 }
 
 export interface CreateLeaveRequestPayload {
@@ -122,6 +124,7 @@ export interface ApiLeaveType {
     description: string;
     isPaid: boolean;
     isActive: boolean;
+    allowPastDates?: boolean;
     defaultAmount: number;
     maxCarryForward: number;
     resetFrequency: 'yearly' | 'monthly' | 'quarterly';

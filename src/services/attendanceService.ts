@@ -8,20 +8,24 @@ export const attendanceService = {
     const response = await api.get("/attendance");
     return response.data;
   },
-  clockIn: async () => {
-    const response = await api.post("/attendance/clock-in");
+  clockIn: async (data?: { latitude?: number; longitude?: number; deviceInfo?: string; remarks?: string }) => {
+    const response = await api.post("/attendance/clock-in", data);
     return response.data;
   },
-  clockOut: async () => {
-    const response = await api.post("/attendance/clock-out");
+  clockOut: async (data?: { latitude?: number; longitude?: number; deviceInfo?: string }) => {
+    const response = await api.post("/attendance/clock-out", data);
     return response.data;
   },
-  breakStart: async () => {
-    const response = await api.post("/attendance/break-start");
+  breakStart: async (breakTypeId?: string) => {
+    const response = await api.post("/attendance/break-start", { breakTypeId });
     return response.data;
   },
   breakResume: async () => {
     const response = await api.post("/attendance/break-resume");
+    return response.data;
+  },
+  getBreakTypes: async () => {
+    const response = await api.get("/break-types", { params: { isActive: true } });
     return response.data;
   },
   getMyStatus: async (config?: AxiosRequestConfig) => {
@@ -44,6 +48,10 @@ export const attendanceService = {
     const response = await api.post("/attendance/correct-logout", data);
     return response.data;
 
+  },
+  trackLocation: async (data: { latitude: number; longitude: number; type?: string }) => {
+    const response = await api.post("/location/track", data, { skipLoading: true } as any);
+    return response.data;
   },
 };
 
