@@ -80,17 +80,31 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
     const [currentTime, setCurrentTime] = useState(new Date());
     const [isTimeSynced, setIsTimeSynced] = useState(false);
 
-    const syncPointRef = useRef<{ serverTime: number; localPerfTime: number } | null>(null);
+    const offsetMsRef = useRef<number | null>(null);
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            if (syncPointRef.current) {
-                const elapsedMs = performance.now() - syncPointRef.current.localPerfTime;
-                setCurrentTime(new Date(syncPointRef.current.serverTime + elapsedMs));
+        const updateClock = () => {
+            const now = Date.now();
+            if (offsetMsRef.current !== null) {
+                setCurrentTime(new Date(now + offsetMsRef.current));
+            } else {
+                setCurrentTime(new Date(now));
             }
-            // Removed fallback to new Date() as it shows incorrect local time
-        }, 1000);
-        return () => clearInterval(timer);
+        };
+
+        const timer = setInterval(updateClock, 1000);
+
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                updateClock();
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            clearInterval(timer);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, []);
 
     const queryClient = useQueryClient();
@@ -129,10 +143,10 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
                     // Sync time from correction data if available
                     if (correctionData.timestamp) {
-                        syncPointRef.current = {
-                            serverTime: new Date(correctionData.timestamp).getTime(),
-                            localPerfTime: performance.now()
-                        };
+                        const serverMs = new Date(correctionData.timestamp).getTime();
+                        if (!isNaN(serverMs)) {
+                            offsetMsRef.current = serverMs - Date.now();
+                        }
                     }
 
                     return { attendanceData: newAttendanceData, status: "not_clocked" as AttendanceStatus };
@@ -157,11 +171,11 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
 
                 // Sync clock with server time from response
                 if (data.timestamp) {
-                    syncPointRef.current = {
-                        serverTime: new Date(data.timestamp).getTime(),
-                        localPerfTime: performance.now()
-                    };
-                    setIsTimeSynced(true);
+                    const serverMs = new Date(data.timestamp).getTime();
+                    if (!isNaN(serverMs)) {
+                        offsetMsRef.current = serverMs - Date.now();
+                        setIsTimeSynced(true);
+                    }
                 }
 
                 if (typeof data.isClockedIn === "boolean") {
@@ -199,12 +213,11 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
                 // Sync clock if timestamp is present
                 if (data.timestamp) {
                     const serverTime = new Date(data.timestamp).getTime();
-                    syncPointRef.current = {
-                        serverTime,
-                        localPerfTime: performance.now()
-                    };
-                    setCurrentTime(new Date(serverTime));
-                    setIsTimeSynced(true);
+                    if (!isNaN(serverTime)) {
+                        offsetMsRef.current = serverTime - Date.now();
+                        setCurrentTime(new Date(Date.now() + offsetMsRef.current));
+                        setIsTimeSynced(true);
+                    }
                 }
 
                 let timestamp = data.timestamp;
@@ -242,7 +255,20 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             }
             return false;
         } catch (err) {
-            setError(getErrorMessage(err, errorFallback));
+            const errMsg = getErrorMessage(err, errorFallback);
+            setError(errMsg);
+
+            // If error indicates session desync or already open session, reload to sync UI state
+            if (
+                errMsg.toLowerCase().includes('already has open session') ||
+                errMsg.toLowerCase().includes('already clocked in') ||
+                errMsg.toLowerCase().includes('open session')
+            ) {
+                await queryClient.invalidateQueries({ queryKey: ['attendance-status'] });
+                setTimeout(() => {
+                    window.location.reload();
+                }, 300);
+            }
             return false;
         } finally {
             setLoading(false);

@@ -3,6 +3,7 @@ import { LogIn, LogOut, Coffee, PlayCircle, Clock, Loader2, CheckCircle, XCircle
 import { cn } from "../../../lib/utils";
 import Button from "../../common/Button/Button";
 import type { AttendanceStatus } from "../../../types/attendance";
+import { getUserTimezone } from "../../../utils/timezone";
 
 interface AttendanceHeroProps {
     status: AttendanceStatus;
@@ -35,6 +36,8 @@ const AttendanceHero: React.FC<AttendanceHeroProps> = ({
     onBreakResume,
     formatTime,
 }) => {
+    const displayTz = (getUserTimezone() || "Asia/Kolkata").replace(/_/g, " ").toUpperCase();
+
     const getStatusConfig = () => {
         switch (status) {
             case "present":
@@ -115,7 +118,7 @@ const AttendanceHero: React.FC<AttendanceHeroProps> = ({
                                         {formatTime(currentTime)}
                                     </p>
                                     <p className="text-white/40 text-[10px] uppercase tracking-[0.2em] font-medium mt-1 group-hover:text-white/60 transition-colors">
-                                        {Intl.DateTimeFormat().resolvedOptions().timeZone.replace('_', ' ')}
+                                        {displayTz}
                                     </p>
                                 </div>
                                 {lastActionTime && status === "clock_out" && (

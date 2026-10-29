@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Clock, ChevronLeft, ChevronRight, Sun, Moon, Umbrella} from "lucide-react";
+import { Clock, ChevronLeft, ChevronRight, Sun, Moon, Umbrella, RefreshCw } from "lucide-react";
 import Card from "../../components/common/Card/Card";
 import Button from "../../components/common/Button/Button";
 import { cn } from "../../lib/utils";
+import { getUserTimezone, getDateInTimezone } from "../../utils/timezone";
 import { useAppSelector } from "../../store/hooks";
 import leaveService from "../../services/leaveService";
 import scheduleService from "../../services/scheduleService";
@@ -29,9 +30,11 @@ const Schedule: React.FC = () => {
   const queryClient = useQueryClient();
 
   const formatDateKey = (date: Date) => {
-    const d = new Date(date);
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    return d.toISOString().split('T')[0];
+    const tzDate = getDateInTimezone(date);
+    const year = tzDate.getFullYear();
+    const month = String(tzDate.getMonth() + 1).padStart(2, "0");
+    const day = String(tzDate.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   };
 
   const formatTime = (time: string) => {
@@ -43,84 +46,71 @@ const Schedule: React.FC = () => {
     return `${h12}:${minutes} ${ampm}`;
   };
 
-  const workingHours = user?.workingHours;
-  const startTime = workingHours?.startTime || "09:00";
-  const endTime = workingHours?.endTime || "17:00";
-  const weeklyOff = useMemo(() => workingHours?.weeklyOff || ["Saturday", "Sunday"], [workingHours?.weeklyOff]);
-
-  // Calculate range based on current view
-  const { weekStart, weekEnd } = useMemo(() => {
-    const start = new Date(currentDate);
-    start.setDate(currentDate.getDate() - currentDate.getDay() + 1 + (weekOffset * 7));
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    return {
-      weekStart: formatDateKey(start),
-      weekEnd: formatDateKey(end)
-    };
-  }, [currentDate, weekOffset]);
-
-  // Fetch approved leaves
   const {
-    data: approvedLeaves = []
-  } = useQuery({
-    queryKey: ["schedule-leaves", user?.id, weekStart, weekEnd],
+    data: approvedLeaves = [],
+    isLoading: leavesLoading,
+  } = useQuery<LeaveRequest[]>({
+    queryKey: ["my-leaves", user?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
-      const response = await leaveService.getMyRequests({
-        status: 'approved',
-        startDate: weekStart,
-        endDate: weekEnd
-      });
-      if (response.status === 'success' || response.success) {
-        return response.data;
-      }
-      return [];
+      const resp = await leaveService.getMyRequests({ status: "approved" });
+      return resp.success && resp.data ? resp.data : [];
     },
     enabled: !!user?.id,
-    staleTime: 5 * 60 * 1000,
   });
 
-  // Fetch roster
   const {
-    data: rosterData = null,
-    // isFetching: isRosterFetching
-  } = useQuery({
-    queryKey: ["schedule-roster", user?.id, weekStart, weekEnd, isHardRefresh],
+    data: rosterData,
+    isLoading: rosterLoading,
+    isRefetching: rosterRefetching,
+    refetch: fetchRoster
+  } = useQuery<any>({
+    queryKey: ["my-roster", formatDateKey(currentDate), weekOffset, isHardRefresh],
     queryFn: async () => {
+      const weekStart = new Date(currentDate);
+      weekStart.setDate(currentDate.getDate() - currentDate.getDay() + 1 + (weekOffset * 7));
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+
+      const start = formatDateKey(weekStart);
+      const end = formatDateKey(weekEnd);
       if (!user?.id) return null;
-      const response = await scheduleService.getRoster(user.id, {
-        startDate: weekStart,
-        endDate: weekEnd,
-        hardRefresh: isHardRefresh
-      });
-
-      const result = response.success && response.data && response.data.length > 0
-        ? response.data[0]
-        : null;
-
-      if (isHardRefresh) {
-        // Update the main cache entry (where isHardRefresh is false)
-        queryClient.setQueryData(["schedule-roster", user?.id, weekStart, weekEnd, false], result);
-        // Reset the flag to return to normal behavior
-        setTimeout(() => setIsHardRefresh(false), 0);
+      const resp = await scheduleService.getRoster(user.id, { startDate: start, endDate: end, hardRefresh: isHardRefresh });
+      if (resp.success && resp.data) {
+        return Array.isArray(resp.data) ? resp.data[0] || null : resp.data;
       }
-
-      return result;
+      return null;
     },
     enabled: !!user?.id,
-    staleTime: isHardRefresh ? 0 : 5 * 60 * 1000,
   });
+
+  const handleRefresh = async () => {
+    setIsHardRefresh(true);
+    await queryClient.invalidateQueries({ queryKey: ["my-roster"] });
+    await fetchRoster();
+    setTimeout(() => setIsHardRefresh(false), 500);
+  };
+
+  const defaultWorkingHours = rosterData?.defaultWorkingHours || user?.workingHours || {
+    startTime: "09:00",
+    endTime: "18:00",
+    weeklyOff: ["Saturday", "Sunday"],
+  };
+
+  const startTime = defaultWorkingHours?.startTime || "09:00";
+  const endTime = defaultWorkingHours?.endTime || "18:00";
+  const weeklyOff = defaultWorkingHours?.weeklyOff || ["Saturday", "Sunday"];
 
   const shifts = useMemo((): Shift[] => {
     const days = [];
     const weekStartObj = new Date(currentDate);
     weekStartObj.setDate(currentDate.getDate() - currentDate.getDay() + 1 + (weekOffset * 7));
 
+    const timezone = getUserTimezone();
+
     for (let i = 0; i < 7; i++) {
       const day = new Date(weekStartObj);
       day.setDate(weekStartObj.getDate() + i);
-      const dayName = day.toLocaleDateString("en-US", { weekday: "long" });
+      const dayName = day.toLocaleDateString("en-US", { weekday: "long", timeZone: timezone });
       const dayKey = formatDateKey(day);
       const rosterShift = rosterData?.shiftData[dayKey];
 
@@ -128,10 +118,10 @@ const Schedule: React.FC = () => {
         ? rosterShift.shiftType === 'off'
         : weeklyOff.includes(dayName);
 
-      const isToday = day.toDateString() === new Date().toDateString();
+      const isToday = formatDateKey(day) === formatDateKey(new Date());
 
       // Check if there's an approved leave on this day
-      const leave = approvedLeaves.find((l) => {
+      const leave = approvedLeaves.find((l: LeaveRequest) => {
         const leaveStart = new Date(l.startDate);
         const leaveEnd = new Date(l.endDate);
         const checkDay = new Date(day);
@@ -155,7 +145,7 @@ const Schedule: React.FC = () => {
         } else if (rosterShift.shiftType === 'off') {
           shiftDisplay = "Off";
         } else if (rosterShift.shifts && rosterShift.shifts.length > 0) {
-          shiftDisplay = rosterShift.shifts.map(s => `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`).join(', ');
+          shiftDisplay = rosterShift.shifts.map((s: any) => `${formatTime(s.startTime)} - ${formatTime(s.endTime)}`).join(', ');
         } else if (rosterShift.startTime?.[0] && rosterShift.endTime?.[0]) {
           shiftDisplay = `${formatTime(rosterShift.startTime[0])} - ${formatTime(rosterShift.endTime[0])}`;
         } else {
@@ -165,10 +155,12 @@ const Schedule: React.FC = () => {
         shiftDisplay = isWeekend ? "Off" : `${formatTime(startTime)} - ${formatTime(endTime)}`;
       }
 
+      const tzDay = getDateInTimezone(day);
+
       days.push({
         day: dayName,
-        shortDay: day.toLocaleDateString("en-US", { weekday: "short" }),
-        date: day.getDate(),
+        shortDay: day.toLocaleDateString("en-US", { weekday: "short", timeZone: timezone }),
+        date: tzDay.getDate(),
         shift: shiftDisplay,
         isToday,
         isWeekend,
@@ -187,7 +179,8 @@ const Schedule: React.FC = () => {
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
 
-    return `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
+    const timezone = getUserTimezone();
+    return `${weekStart.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: timezone })} - ${weekEnd.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: timezone })}`;
   };
 
   return (
@@ -196,16 +189,16 @@ const Schedule: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <h1 className="text-xl sm:text-2xl font-bold text-foreground">My Schedule</h1>
         <div className="flex items-center gap-2">
-          {/* <Button
+          <Button
             variant="ghost"
             size="sm"
-            onClick={() => setIsHardRefresh(true)}
-            disabled={isHardRefresh || isRosterFetching}
+            onClick={handleRefresh}
+            disabled={isHardRefresh || rosterRefetching}
             className="text-foreground-secondary hover:text-primary transition-colors"
           >
-            <RefreshCw className={cn("w-4 h-4 mr-2", (isHardRefresh || isRosterFetching) && "animate-spin")} />
+            <RefreshCw className={cn("w-4 h-4 mr-2", (isHardRefresh || rosterRefetching) && "animate-spin")} />
             <span className="hidden sm:inline">Hard Refresh</span>
-          </Button> */}
+          </Button>
 
           <Button
             variant="outline"
@@ -229,8 +222,15 @@ const Schedule: React.FC = () => {
         </div>
       </div>
 
-      {/* Today's Shift Highlight */}
-      {
+      {rosterLoading || leavesLoading ? (
+        <Card className="p-12 flex flex-col items-center justify-center gap-3">
+          <RefreshCw className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-sm font-medium text-foreground-secondary">Loading schedule...</p>
+        </Card>
+      ) : (
+        <>
+          {/* Today's Shift Highlight */}
+          {
         (() => {
           const todayShift = shifts.find(s => s.isToday);
           const isOnLeave = !!todayShift?.leave;
@@ -388,7 +388,9 @@ const Schedule: React.FC = () => {
 
         </div>
       </div>
-    </div >
+        </>
+      )}
+    </div>
   );
 };
 

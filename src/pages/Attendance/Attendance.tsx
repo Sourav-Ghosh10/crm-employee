@@ -5,6 +5,7 @@ import Button from "../../components/common/Button/Button";
 import Modal from "../../components/common/Modal/Modal";
 import { useAttendance } from "../../hooks/useAttendance";
 import AttendanceHero from "../../components/features/attendance/AttendanceHero";
+import AttendanceMonthView from "../../components/features/attendance/AttendanceMonthView";
 import StatCard from "../../components/common/Card/StatCard";
 import ErrorAlert from "../../components/common/ErrorAlert";
 
@@ -29,6 +30,7 @@ const Attendance: React.FC = () => {
   const [breakTypes, setBreakTypes] = useState<BreakType[]>([]);
   const [selectedBreakTypeId, setSelectedBreakTypeId] = useState<string>("");
   const [fetchingBreakTypes, setFetchingBreakTypes] = useState(false);
+  const [viewMode, setViewMode] = useState<"month" | "week">("month");
 
   const {
     status,
@@ -151,6 +153,50 @@ const Attendance: React.FC = () => {
         ))}
       </div>
 
+      {/* View Switcher Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+        <div className="flex items-center gap-1.5 bg-surface border border-border p-1.5 rounded-2xl shadow-sm w-fit">
+          <button
+            type="button"
+            onClick={() => setViewMode("month")}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2",
+              viewMode === "month"
+                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                : "text-foreground-secondary hover:text-foreground hover:bg-muted/50"
+            )}
+          >
+            <Calendar className="w-4 h-4" />
+            <span>Month-wise View</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("week")}
+            className={cn(
+              "px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2",
+              viewMode === "week"
+                ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                : "text-foreground-secondary hover:text-foreground hover:bg-muted/50"
+            )}
+          >
+            <Clock className="w-4 h-4" />
+            <span>Today & This Week</span>
+          </button>
+        </div>
+        <div className="text-xs text-foreground-secondary font-medium hidden sm:block">
+          {viewMode === "month"
+            ? "Interactive monthly attendance grid & shift breakdown"
+            : "Today's session details & current week logs"}
+        </div>
+      </div>
+
+      {viewMode === "month" ? (
+        <AttendanceMonthView
+          attendanceData={attendanceData}
+          currentTime={currentTime}
+          workingHoursFormatted={workingHoursFormatted}
+        />
+      ) : (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <Card title="Today's Details">
           <div className="space-y-4">
@@ -215,9 +261,6 @@ const Attendance: React.FC = () => {
                   const date = new Date(monday);
                   date.setDate(monday.getDate() + idx);
 
-                  // Only show days that belong to the current month
-                  if (date.getMonth() !== currentDateTz.getMonth()) return null;
-
                   // Construct YYYY-MM-DD manually
                   const year = date.getFullYear();
                   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -235,7 +278,8 @@ const Attendance: React.FC = () => {
                   todayZero.setHours(0, 0, 0, 0);
                   const isPast = dateZero < todayZero;
 
-                  const isOffDay = attendanceData?.monthlyOffDays?.includes(dateStr);
+                  const isWeekend = day.dayIndex === 0 || day.dayIndex === 6;
+                  const isOffDay = attendanceData?.monthlyOffDays?.includes(dateStr) || isWeekend;
                   const holiday = attendanceData?.monthlyHolidays?.find((h) => h.date === dateStr);
                   const leave = attendanceData?.monthlyLeaves?.find((l: any) => l.date === dateStr);
 
@@ -333,6 +377,7 @@ const Attendance: React.FC = () => {
         </Card>
 
       </div>
+      )}
 
       <Modal
         open={isClockOutModalOpen}

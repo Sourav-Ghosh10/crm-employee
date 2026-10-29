@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, CheckCircle2, XCircle, AlertCircle, Briefcase } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { cn } from "../../../lib/utils";
 import type { LeaveRequest, LeaveType } from "../../../types/leave.types";
 import { leaveTypeLabels } from "../../../types/leave.types";

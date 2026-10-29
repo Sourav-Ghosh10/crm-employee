@@ -32,6 +32,13 @@ export const attendanceService = {
     const response = await api.get("/attendance/status", config);
     return response.data;
   },
+  getMyMonthSummary: async (year: number, month: number, config?: AxiosRequestConfig) => {
+    const response = await api.get("/attendance/my-month-summary", {
+      params: { year, month },
+      ...config
+    });
+    return response.data;
+  },
   checkCorrection: async (config?: AxiosRequestConfig) => {
     const response = await api.get("/attendance/check-correction", config);
     return response.data;
