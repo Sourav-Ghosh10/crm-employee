@@ -3,6 +3,7 @@ import type { AxiosError, InternalAxiosRequestConfig, AxiosRequestHeaders, Axios
 import { getItem, setItem, removeItem, getSessionItem, setSessionItem, removeSessionItem } from "../utils/storage";
 import { store } from "../store/store";
 import { startLoading, stopLoading } from "../store/slices/uiSlice";
+import { logoutSuccess } from "../store/slices/authSlice";
 import pushNotificationService from "./pushNotificationService";
 
 export interface CustomAxiosConfig extends AxiosRequestConfig {
@@ -116,29 +117,28 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    const redirectToLogin = () => {
+      tokenStorage.clearTokens();
+      store.dispatch(logoutSuccess());
+      if (!isUnregisterCall) {
+        pushNotificationService.unregisterToken().catch(() => {});
+      }
+      const publicUrl = (import.meta.env.VITE_PUBLIC_URL || "").replace(/\/$/, "");
+      const loginUrl = `${publicUrl}/login`;
+      if (!window.location.pathname.endsWith("/login")) {
+        window.location.href = loginUrl;
+      }
+    };
+
     // Prevent infinite loop
     if (originalRequest._retry || isUnregisterCall) {
-      // ONLY unregister if this isn't the unregister call itself failing
-      if (!isUnregisterCall) {
-        await pushNotificationService.unregisterToken();
-      }
-      tokenStorage.clearTokens();
-      if (!window.location.pathname.includes("/login")) {
-        window.location.href = "/login";
-      }
+      redirectToLogin();
       return Promise.reject(error);
     }
 
     const refreshToken = tokenStorage.getRefreshToken();
     if (!refreshToken) {
-      // ONLY unregister if this isn't the unregister call itself failing
-      if (!isUnregisterCall) {
-        await pushNotificationService.unregisterToken();
-      }
-      tokenStorage.clearTokens();
-      if (!window.location.pathname.includes("/login")) {
-        window.location.href = "/login";
-      }
+      redirectToLogin();
       return Promise.reject(error);
     }
 
@@ -174,10 +174,7 @@ api.interceptors.response.use(
       } catch (refreshError) {
         apiTyped._isRefreshing = false;
         apiTyped._refreshSubscribers = [];
-        tokenStorage.clearTokens();
-        if (!window.location.pathname.includes("/login")) {
-          window.location.href = "/login";
-        }
+        redirectToLogin();
         return Promise.reject(refreshError);
       }
     }

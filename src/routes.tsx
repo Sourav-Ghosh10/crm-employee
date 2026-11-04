@@ -2,6 +2,7 @@ import React, { Suspense, lazy } from "react";
 import { createBrowserRouter, RouterProvider } from "react-router-dom";
 import MainLayout from "./components/layout/MainLayout";
 import RequireAuth from "./components/common/RequireAuth";
+import GuestRoute from "./components/common/GuestRoute";
 import LoadingSpinner from "./components/common/LoadingSpinner";
 import { AttendanceProvider } from "./contexts/AttendanceContext";
 
@@ -140,17 +141,21 @@ const router = createBrowserRouter([
   {
     path: "/login",
     element: (
-      <Suspense fallback={<Loading />}>
-        <Login />
-      </Suspense>
+      <GuestRoute>
+        <Suspense fallback={<Loading />}>
+          <Login />
+        </Suspense>
+      </GuestRoute>
     ),
   },
   {
     path: "/forgot-password",
     element: (
-      <Suspense fallback={<Loading />}>
-        <ForgotPassword />
-      </Suspense>
+      <GuestRoute>
+        <Suspense fallback={<Loading />}>
+          <ForgotPassword />
+        </Suspense>
+      </GuestRoute>
     ),
   },
 ], {
