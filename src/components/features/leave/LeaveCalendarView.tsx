@@ -16,6 +16,17 @@ const formatToYYYYMMDD = (year: number, month: number, day: number): string => {
   return `${y}-${m}-${d}`;
 };
 
+const normalizeToYYYYMMDD = (dateVal: string | Date): string => {
+  if (!dateVal) return "";
+  if (typeof dateVal === "string") {
+    const match = dateVal.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (match) return match[1];
+  }
+  const d = new Date(dateVal);
+  if (isNaN(d.getTime())) return "";
+  return formatToYYYYMMDD(d.getFullYear(), d.getMonth(), d.getDate());
+};
+
 const getStatusBadge = (status: string) => {
   switch (status?.toLowerCase()) {
     case "approved":
@@ -166,18 +177,35 @@ const LeaveCalendarView: React.FC<LeaveCalendarViewProps> = ({
           const isWeekend = new Date(currentYear, currentMonth, dayNum).getDay() === 0 || new Date(currentYear, currentMonth, dayNum).getDay() === 6;
           const isToday = dateStr === todayStr;
 
-          // Find leaves spanning across this date
+          // Find leaves spanning across this date (normalize ISO dates to YYYY-MM-DD)
           const dayLeaves = requests.filter((req) => {
             if (!req.startDate || !req.endDate) return false;
-            return dateStr >= req.startDate && dateStr <= req.endDate;
+            const startStr = normalizeToYYYYMMDD(req.startDate);
+            const endStr = normalizeToYYYYMMDD(req.endDate);
+            if (!startStr || !endStr) return false;
+            return dateStr >= startStr && dateStr <= endStr;
           });
+
+          const primaryLeaveStatus = dayLeaves.find((l) => l.status?.toLowerCase() === "approved")?.status
+            || dayLeaves.find((l) => l.status?.toLowerCase() === "pending")?.status
+            || dayLeaves[0]?.status;
+
+          const cellTint =
+            primaryLeaveStatus?.toLowerCase() === "approved"
+              ? "bg-success/[0.06]"
+              : primaryLeaveStatus?.toLowerCase() === "pending"
+              ? "bg-warning/[0.06]"
+              : primaryLeaveStatus?.toLowerCase() === "rejected"
+              ? "bg-error/[0.04]"
+              : "bg-card";
 
           return (
             <div
               key={dateStr}
               onClick={() => onSelectDateToApply(dateStr)}
               className={cn(
-                "group relative bg-card hover:bg-primary/[0.04] transition-all duration-200 min-h-[90px] sm:min-h-[110px] p-2 flex flex-col justify-between cursor-pointer border-transparent hover:z-10 hover:shadow-lg select-none"
+                "group relative hover:bg-primary/[0.04] transition-all duration-200 min-h-[90px] sm:min-h-[110px] p-2 flex flex-col justify-between cursor-pointer border-transparent hover:z-10 hover:shadow-lg select-none",
+                cellTint
               )}
             >
               {/* Day Number and Badges */}
@@ -207,6 +235,8 @@ const LeaveCalendarView: React.FC<LeaveCalendarViewProps> = ({
                 {dayLeaves.map((leave) => {
                   const badge = getStatusBadge(leave.status);
                   const typeLabel = leaveTypeLabels[leave.leaveType as LeaveType] || leave.leaveType;
+                  const shortType = typeLabel.replace(/\s*Leave$/i, "");
+                  const statusLabel = leave.status ? leave.status.charAt(0).toUpperCase() + leave.status.slice(1) : "Pending";
                   return (
                     <div
                       key={leave._id || `${leave.startDate}-${leave.leaveType}`}
@@ -214,16 +244,17 @@ const LeaveCalendarView: React.FC<LeaveCalendarViewProps> = ({
                         "px-1.5 py-1 rounded-lg border text-[11px] font-medium flex items-center justify-between gap-1 shadow-xs truncate transition-transform hover:scale-[1.02]",
                         badge.bg
                       )}
-                      title={`${typeLabel} (${leave.status || 'pending'}) - ${leave.reason || ''}`}
+                      title={`${typeLabel}${leave.halfDay ? " (Half Day)" : ""} • ${statusLabel}${leave.reason ? ` — ${leave.reason}` : ""}`}
                       onClick={(e) => {
-                        // Clicking an existing leave also triggers applying or inspecting on that date
                         e.stopPropagation();
                         onSelectDateToApply(dateStr);
                       }}
                     >
                       <div className="flex items-center gap-1 truncate">
                         {badge.icon}
-                        <span className="truncate font-semibold">{typeLabel.replace(" Leave", "")}</span>
+                        <span className="truncate font-semibold">
+                          {shortType}{leave.halfDay ? " (Half)" : ""}
+                        </span>
                       </div>
                     </div>
                   );

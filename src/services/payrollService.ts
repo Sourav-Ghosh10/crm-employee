@@ -58,6 +58,7 @@ const payrollService = {
     month?: number;
     year?: number;
     status?: string;
+    excludeStatus?: string;
     employeeId?: string;
   }): Promise<PayslipResponse> => {
     const response = await api.get("/payroll/payslips", { params });

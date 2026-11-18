@@ -1,6 +1,7 @@
 import html2pdf from 'html2pdf.js';
 import { format } from 'date-fns';
 import type { Payslip } from '../services/payrollService';
+import nrnstLogo from '../assets/nrnst-logo.png';
 
 export const generatePayslipHtml = (
   payslip: Payslip,
@@ -21,7 +22,11 @@ export const generatePayslipHtml = (
   const employeeName = employeeData?.personalInfo
     ? `${employeeData.personalInfo.firstName} ${employeeData.personalInfo.lastName}`
     : (user ? `${user.firstName} ${user.lastName}` : "");
-  const employeeIdStr = employeeData?.employment?.employeeId || user?.employeeId || "";
+  const employeeIdStr =
+    employeeData?.employeeId ||
+    employeeData?.employment?.employeeId ||
+    user?.employeeId ||
+    "";
   const designation = employeeData?.employment?.designation?.name ||
     employeeData?.employment?.designation ||
     user?.designation ||
@@ -30,14 +35,33 @@ export const generatePayslipHtml = (
     employeeData?.employment?.department ||
     user?.department ||
     "";
-  const joinDate = employeeData?.employment?.joinDate
-    ? format(new Date(employeeData.employment.joinDate), "dd MMM yyyy")
+  const rawJoinDate =
+    employeeData?.employment?.dateOfJoining ||
+    employeeData?.employment?.joinDate ||
+    user?.joinDate;
+  const joinDate = rawJoinDate && !isNaN(new Date(rawJoinDate).getTime())
+    ? format(new Date(rawJoinDate), "dd MMM yyyy")
     : "";
   const locationName = officeLocation?.name || employeeData?.employment?.location || "";
-  const bankName = employeeData?.bankDetails?.bankName || "";
-  const bankAccount = employeeData?.bankDetails?.accountNumber || "";
-  const panNumber = employeeData?.personalInfo?.panNumber || "";
-  const pfNo = employeeData?.employment?.pfNumber || "";
+  const salaryConfigData = typeof payslip.salaryConfigId === "object" ? (payslip.salaryConfigId as any) : null;
+  const bankName =
+    employeeData?.employment?.bankName ||
+    employeeData?.bankDetails?.bankName ||
+    salaryConfigData?.bankName ||
+    "";
+  const bankAccount =
+    employeeData?.employment?.bankAccountNo ||
+    employeeData?.bankDetails?.accountNumber ||
+    salaryConfigData?.bankAccountNo ||
+    "";
+  const ifscCode =
+    employeeData?.employment?.ifscCode ||
+    employeeData?.bankDetails?.ifscCode ||
+    "";
+  const panNumber =
+    employeeData?.employment?.panNumber ||
+    employeeData?.personalInfo?.panNumber ||
+    "";
   const pfUan = employeeData?.employment?.uanNumber || "";
 
   const companyName = "NRNST TECH PRIVATE LIMITED";
@@ -77,15 +101,25 @@ export const generatePayslipHtml = (
     `;
   }).join('');
 
+  const logoSrc = typeof window !== 'undefined'
+    ? new URL(nrnstLogo, window.location.origin).href
+    : nrnstLogo;
+
   return `
     <div style="font-family: Arial, sans-serif; font-size: 11px; color: #000; background-color: #fff; width: 100%; max-width: 780px; margin: 0 auto; padding: 10px;">
       <div style="border: 1px solid #000;">
 
         <!-- Header -->
-        <div style="text-align: center; padding: 14px 10px 12px; border-bottom: 1px solid #000;">
-          <div style="font-size: 18px; font-weight: bold; margin-bottom: 4px;">${companyName}</div>
-          <div style="font-size: 10px; color: #444; margin-bottom: 10px;">${companyAddress}</div>
-          <div style="font-weight: bold; font-size: 13px;">Payslip for the month of ${getMonthName(payslip.month)} ${payslip.year}</div>
+        <div style="display: table; width: 100%; padding: 12px 14px; border-bottom: 1px solid #000; box-sizing: border-box;">
+          <div style="display: table-cell; width: 130px; vertical-align: middle; text-align: left;">
+            <img src="${logoSrc}" alt="NRNST Tech Logo" style="height: 50px; width: auto; max-width: 125px; object-fit: contain; display: block;" />
+          </div>
+          <div style="display: table-cell; vertical-align: middle; text-align: center; padding: 0 8px;">
+            <div style="font-size: 18px; font-weight: bold; margin-bottom: 4px;">${companyName}</div>
+            <div style="font-size: 10px; color: #444; margin-bottom: 8px;">${companyAddress}</div>
+            <div style="font-weight: bold; font-size: 13px;">Payslip for the month of ${getMonthName(payslip.month)} ${payslip.year}</div>
+          </div>
+          <div style="display: table-cell; width: 130px;"></div>
         </div>
 
         <!-- Employee Details -->
@@ -108,8 +142,8 @@ export const generatePayslipHtml = (
               <tr><td style="padding: 3px 0; width: 145px; color: #333;">Employee No:</td><td style="padding: 3px 0; font-weight: 600;">${employeeIdStr}</td></tr>
               <tr><td style="padding: 3px 0; color: #333;">Bank Name:</td><td style="padding: 3px 0;">${bankName}</td></tr>
               <tr><td style="padding: 3px 0; color: #333;">Bank Account No:</td><td style="padding: 3px 0;">${bankAccount}</td></tr>
+              <tr><td style="padding: 3px 0; color: #333;">IFSC Code:</td><td style="padding: 3px 0;">${ifscCode}</td></tr>
               <tr><td style="padding: 3px 0; color: #333;">PAN Number:</td><td style="padding: 3px 0;">${panNumber}</td></tr>
-              <tr><td style="padding: 3px 0; color: #333;">PF No:</td><td style="padding: 3px 0;">${pfNo}</td></tr>
               <tr><td style="padding: 3px 0; color: #333;">PF UAN:</td><td style="padding: 3px 0;">${pfUan}</td></tr>
             </table>
           </div>

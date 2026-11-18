@@ -10,6 +10,7 @@ import Button from "../../components/common/Button/Button";
 import { Printer, Download, Mail } from "lucide-react";
 import { format } from "date-fns";
 import { downloadPayslipAsPDF } from "../../utils/pdfGenerator";
+import nrnstLogo from "../../assets/nrnst-logo.png";
 
 interface PayslipDetailProps {
   isOpen: boolean;
@@ -225,7 +226,11 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ isOpen, onClose, payslip 
   const employeeName = employeeData?.personalInfo
     ? `${employeeData.personalInfo.firstName} ${employeeData.personalInfo.lastName}`
     : (user ? `${user.firstName} ${user.lastName}` : "");
-  const employeeIdStr = employeeData?.employment?.employeeId || user?.employeeId || "";
+  const employeeIdStr =
+    employeeData?.employeeId ||
+    employeeData?.employment?.employeeId ||
+    user?.employeeId ||
+    "";
   const designation = employeeData?.employment?.designation?.name || 
                       employeeData?.employment?.designation || 
                       user?.designation || 
@@ -234,20 +239,42 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ isOpen, onClose, payslip 
                      employeeData?.employment?.department || 
                      user?.department || 
                      "";
-  const joinDate = employeeData?.employment?.joinDate 
-    ? format(new Date(employeeData.employment.joinDate), "dd MMM yyyy") 
+  const rawJoinDate =
+    employeeData?.employment?.dateOfJoining ||
+    employeeData?.employment?.joinDate ||
+    user?.joinDate;
+  const joinDate = rawJoinDate && !isNaN(new Date(rawJoinDate).getTime())
+    ? format(new Date(rawJoinDate), "dd MMM yyyy")
     : "";
   const locationName = officeLocation?.name || employeeData?.employment?.location || "";
-  const bankName = employeeData?.bankDetails?.bankName || "";
-  const bankAccount = employeeData?.bankDetails?.accountNumber || "";
-  const panNumber = employeeData?.personalInfo?.panNumber || "";
-  const pfNo = employeeData?.employment?.pfNumber || "";
+  const salaryConfigData = typeof payslip.salaryConfigId === "object" ? (payslip.salaryConfigId as any) : null;
+  const bankName =
+    employeeData?.employment?.bankName ||
+    employeeData?.bankDetails?.bankName ||
+    salaryConfigData?.bankName ||
+    "";
+  const bankAccount =
+    employeeData?.employment?.bankAccountNo ||
+    employeeData?.bankDetails?.accountNumber ||
+    salaryConfigData?.bankAccountNo ||
+    "";
+  const ifscCode =
+    employeeData?.employment?.ifscCode ||
+    employeeData?.bankDetails?.ifscCode ||
+    "";
+  const panNumber =
+    employeeData?.employment?.panNumber ||
+    employeeData?.personalInfo?.panNumber ||
+    "";
   const pfUan = employeeData?.employment?.uanNumber || "";
 
   const companyName = "NRNST TECH PRIVATE LIMITED";
   const companyAddress = officeLocation ? 
     `${officeLocation.address.street}, ${officeLocation.address.city}, ${officeLocation.address.state} - ${officeLocation.address.zipCode}` : 
     "";
+  const logoSrc = typeof window !== "undefined"
+    ? new URL(nrnstLogo, window.location.origin).href
+    : nrnstLogo;
 
   return (
     <Modal
@@ -302,16 +329,26 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ isOpen, onClose, payslip 
           <div style={{ border: "1px solid #000" }}>
             
             {/* Header Section */}
-            <div style={{ textAlign: "center", padding: "10px", borderBottom: "1px solid #000" }}>
-              <div style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "4px" }}>
-                {companyName}
+            <div style={{ display: "table", width: "100%", padding: "12px 14px", borderBottom: "1px solid #000", boxSizing: "border-box" }}>
+              <div style={{ display: "table-cell", width: "130px", verticalAlign: "middle", textAlign: "left" }}>
+                <img
+                  src={logoSrc}
+                  alt="NRNST Tech Logo"
+                  style={{ height: "50px", width: "auto", maxWidth: "125px", objectFit: "contain", display: "block" }}
+                />
               </div>
-              <div style={{ fontSize: "10px", marginBottom: "8px" }}>
-                {companyAddress}
+              <div style={{ display: "table-cell", verticalAlign: "middle", textAlign: "center", padding: "0 8px" }}>
+                <div style={{ fontSize: "16px", fontWeight: "bold", marginBottom: "4px" }}>
+                  {companyName}
+                </div>
+                <div style={{ fontSize: "10px", marginBottom: "8px" }}>
+                  {companyAddress}
+                </div>
+                <div style={{ fontWeight: "bold", fontSize: "12px", marginTop: "6px" }}>
+                  Payslip for the month of {getMonthName(payslip.month)} {payslip.year}
+                </div>
               </div>
-              <div style={{ fontWeight: "bold", fontSize: "12px", marginTop: "8px" }}>
-                Payslip for the month of {getMonthName(payslip.month)} {payslip.year}
-              </div>
+              <div style={{ display: "table-cell", width: "130px" }} />
             </div>
 
             {/* Employee Details Section */}
@@ -329,8 +366,8 @@ const PayslipDetail: React.FC<PayslipDetailProps> = ({ isOpen, onClose, payslip 
                 <div style={{ display: "flex", marginBottom: "2px" }}><div style={{ width: "130px" }}>Employee No:</div><div>{employeeIdStr}</div></div>
                 <div style={{ display: "flex", marginBottom: "2px" }}><div style={{ width: "130px" }}>Bank Name:</div><div>{bankName}</div></div>
                 <div style={{ display: "flex", marginBottom: "2px" }}><div style={{ width: "130px" }}>Bank Account No:</div><div>{bankAccount}</div></div>
+                <div style={{ display: "flex", marginBottom: "2px" }}><div style={{ width: "130px" }}>IFSC Code:</div><div>{ifscCode}</div></div>
                 <div style={{ display: "flex", marginBottom: "2px" }}><div style={{ width: "130px" }}>PAN Number:</div><div>{panNumber}</div></div>
-                <div style={{ display: "flex", marginBottom: "2px" }}><div style={{ width: "130px" }}>PF No:</div><div>{pfNo}</div></div>
                 <div style={{ display: "flex", marginBottom: "2px" }}><div style={{ width: "130px" }}>PF UAN:</div><div>{pfUan}</div></div>
               </div>
             </div>

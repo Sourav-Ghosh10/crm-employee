@@ -92,7 +92,7 @@ const Leave: React.FC = () => {
   } = useQuery({
     queryKey: ["leave-requests", statusFilter],
     queryFn: async () => {
-      const params: Record<string, string> = {};
+      const params: { status?: string; limit?: number } = { limit: 100 };
       if (statusFilter !== "all") params.status = statusFilter;
       const response = await leaveService.getMyRequests(params);
       if (response.success || response.status === 'success') {
