@@ -8,11 +8,11 @@ export const attendanceService = {
     const response = await api.get("/attendance");
     return response.data;
   },
-  clockIn: async (data?: { latitude?: number; longitude?: number; deviceInfo?: string; remarks?: string }) => {
+  clockIn: async (data?: { latitude?: number; longitude?: number; deviceInfo?: string; device?: 'mobile' | 'desktop' | string; remarks?: string }) => {
     const response = await api.post("/attendance/clock-in", data);
     return response.data;
   },
-  clockOut: async (data?: { latitude?: number; longitude?: number; deviceInfo?: string }) => {
+  clockOut: async (data?: { latitude?: number; longitude?: number; deviceInfo?: string; device?: 'mobile' | 'desktop' | string }) => {
     const response = await api.post("/attendance/clock-out", data);
     return response.data;
   },

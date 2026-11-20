@@ -16,6 +16,8 @@ import { logout } from "../../store/slices/authSlice";
 import { cn } from "../../lib/utils";
 import logoStatic from "../../assets/codecit-logo.png";
 import { announcementService } from "../../services/announcementService";
+import { notificationService } from "../../services/notificationService";
+import { toast } from "react-hot-toast";
 import { useSocket } from "../../hooks/useSocket";
 import { formatInTimezone } from "../../utils/timezone";
 import { setUnreadCount } from "../../store/slices/notificationSlice";
@@ -31,6 +33,8 @@ interface HeaderNotification {
   time: string;
   unread: boolean;
   priority: string;
+  source: 'notification' | 'announcement';
+  actionUrl?: string;
 }
 
 
@@ -47,6 +51,7 @@ interface NotificationDropdownProps {
   navigate: (path: string) => void;
   notifications?: HeaderNotification[]; // Using the new interface instead of any
   onNotificationOpen?: () => void;
+  onNotificationClick: (notification: HeaderNotification) => void;
 }
 
 interface UserDropdownProps {
@@ -72,11 +77,13 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
   navigate,
   notifications = [], // Default to empty array if not provided
   onNotificationOpen,
+  onNotificationClick,
 }) => {
 
   const getIconForType = (type: string) => {
     switch (type) {
-      case 'leave': return Calendar;
+      case 'leave':
+      case 'leave-request': return Calendar;
       case 'attendance': return Clock;
       case 'general':
       case 'holiday': return Bell;
@@ -86,7 +93,8 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
 
   const getIconBgForType = (type: string) => {
     switch (type) {
-      case 'leave': return "bg-blue-100 text-blue-600";
+      case 'leave':
+      case 'leave-request': return "bg-blue-100 text-blue-600";
       case 'attendance': return "bg-orange-100 text-orange-600";
       case 'high': return "bg-red-100 text-red-600";
       default: return "bg-primary/10 text-primary";
@@ -140,17 +148,7 @@ const NotificationDropdown: React.FC<NotificationDropdownProps> = ({
                 return (
                   <button
                     key={notification.id}
-                    onClick={async () => {
-                      setNotificationDropdownOpen(false);
-                      try {
-                        if (notification.unread) {
-                          await announcementService.markRead(notification.id);
-                        }
-                      } catch (error) {
-                        console.error("Failed to mark notification as read", error);
-                      }
-                      navigate('/announcements');
-                    }}
+                    onClick={() => onNotificationClick(notification)}
                     className={cn(
                       "w-full flex items-start gap-3 px-4 py-3 hover:bg-muted transition-colors text-left",
                       notification.unread && "bg-primary/5",
@@ -335,14 +333,96 @@ const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
   };
 
 
-  // Fetch announcements for notifications using useQuery
+  const formatRelativeTime = (dateInput: string | Date | undefined) => {
+    if (!dateInput) return "";
+    const date = new Date(dateInput);
+    if (isNaN(date.getTime())) return "";
+    const diffMs = Date.now() - date.getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return "Just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return formatInTimezone(date, { day: "numeric", month: "short" });
+  };
+
+  const handleNotificationClick = async (notification: HeaderNotification) => {
+    setNotificationDropdownOpen(false);
+
+    if (notification.source === "announcement") {
+      try {
+        if (notification.unread) {
+          await announcementService.markRead(notification.id);
+        }
+      } catch (error) {
+        console.error("Failed to mark announcement as read", error);
+      }
+      navigate("/announcements");
+      return;
+    }
+
+    // Personal notification
+    try {
+      if (notification.unread) {
+        await notificationService.markAsRead(notification.id);
+      }
+    } catch (error) {
+      console.error("Failed to mark notification as read", error);
+    }
+
+    // If leave request (or related to leave)
+    if (
+      notification.type === "leave-request" ||
+      notification.type === "leave" ||
+      notification.actionUrl?.includes("/leave")
+    ) {
+      // Synchronously open a new tab to prevent popup blocker
+      const newTab = window.open("about:blank", "_blank");
+      try {
+        const { ssoToken } = await notificationService.getAdminSSOToken();
+        const adminUrl = import.meta.env.VITE_ADMIN_PORTAL_URL || "http://localhost:5173";
+        const redirectParam = encodeURIComponent("/leave");
+        const targetUrl = `${adminUrl}/login?ssoToken=${encodeURIComponent(ssoToken)}&redirect=${redirectParam}`;
+        if (newTab) {
+          newTab.location.href = targetUrl;
+        } else {
+          window.open(targetUrl, "_blank");
+        }
+      } catch (err: unknown) {
+        if (newTab) newTab.close();
+        const errObj = err as { response?: { data?: { message?: string; error?: { message?: string } } }; message?: string };
+        const msg =
+          errObj?.response?.data?.message ||
+          errObj?.response?.data?.error?.message ||
+          errObj?.message ||
+          "Failed to auto-login to admin portal. Please check administrator permissions.";
+        toast.error(msg);
+      }
+    } else if (notification.actionUrl) {
+      navigate(notification.actionUrl);
+    }
+  };
+
+  // Fetch both personal notifications and announcements using useQuery
   const { data: notificationData, error: notificationError } = useQuery({
     queryKey: ["notifications-dropdown", refreshTrigger],
     queryFn: async () => {
-      if (!user) return { announcements: [] };
-      return announcementService.getEmployeeAnnouncements({ page: 1, limit: 10 });
+      if (!user) return { notifications: [], announcements: [] };
+      const [notifResult, annResult] = await Promise.allSettled([
+        notificationService.getNotifications({ page: 1, limit: 10 }),
+        announcementService.getEmployeeAnnouncements({ page: 1, limit: 10 }),
+      ]);
+
+      const notifications = notifResult.status === "fulfilled" ? notifResult.value.notifications : [];
+      const announcements = annResult.status === "fulfilled" ? annResult.value.announcements : [];
+
+      return { notifications, announcements };
     },
-    staleTime: 30000,
+    staleTime: 15000,
+    refetchInterval: 30000,
   });
 
   // Log error if any
@@ -354,8 +434,20 @@ const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
 
   // Map and sync notifications when data changes
   useEffect(() => {
-    if (notificationData?.announcements) {
-      const unreadItems: HeaderNotification[] = notificationData.announcements
+    if (notificationData) {
+      const personalItems: HeaderNotification[] = (notificationData.notifications || []).map((n) => ({
+        id: n._id || n.id || "",
+        type: n.type || "leave-request",
+        title: n.title,
+        message: n.message,
+        time: formatRelativeTime(n.createdAt),
+        unread: !n.isRead,
+        priority: n.priority || "medium",
+        source: "notification",
+        actionUrl: n.actionUrl,
+      }));
+
+      const announcementItems: HeaderNotification[] = (notificationData.announcements || [])
         .filter((announcement: Announcement) => !announcement.isRead)
         .map((announcement: Announcement) => ({
           id: announcement.id,
@@ -364,13 +456,20 @@ const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
           message: announcement.content,
           time: announcement.expiryDate ? formatInTimezone(new Date(announcement.expiryDate), { day: 'numeric', month: 'short' }) : 'No Expiry',
           unread: true,
-          priority: announcement.priority
+          priority: announcement.priority,
+          source: "announcement",
         }));
 
-      setAnnouncements(unreadItems);
-      // Only sync if we're not in the middle of a push notification optimistic update
-      // or just let it sync since we have the latest data now
-      dispatch(setUnreadCount(unreadItems.length));
+      const combined = [...personalItems, ...announcementItems];
+      combined.sort((a, b) => {
+        if (a.unread && !b.unread) return -1;
+        if (!a.unread && b.unread) return 1;
+        return 0;
+      });
+
+      setAnnouncements(combined);
+      const totalUnread = combined.filter((item) => item.unread).length;
+      dispatch(setUnreadCount(totalUnread));
     }
   }, [notificationData, dispatch]);
 
@@ -468,6 +567,7 @@ const Header: React.FC<HeaderProps> = ({ handleDrawerToggle }) => {
             navigate={navigate}
             notifications={announcements}
             onNotificationOpen={resetNotificationCount}
+            onNotificationClick={handleNotificationClick}
           />
           <div className="w-px h-8 bg-border mx-1 md:mx-2" />
           <UserDropdown

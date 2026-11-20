@@ -5,38 +5,90 @@ import type { CustomAxiosConfig } from "../services/api";
 import { getErrorMessage } from "../utils/errorHandlers";
 import type { AttendanceStatus, AttendanceStatusResponse } from "../types/attendance";
 
+const getDeviceType = (): 'mobile' | 'desktop' => {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
+    const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(ua);
+    const isMobileScreen = typeof window !== 'undefined' && window.innerWidth <= 768 && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+    return isMobileUA || isMobileScreen ? 'mobile' : 'desktop';
+};
+
+const fetchIpCoordinates = async (): Promise<{ latitude: number; longitude: number } | null> => {
+    // 1st attempt: ipwho.is (fast, CORS enabled)
+    try {
+        const res = await fetch("https://ipwho.is/", { signal: AbortSignal.timeout(4000) });
+        if (res.ok) {
+            const data = await res.json();
+            if (data && data.success !== false && typeof data.latitude === "number" && typeof data.longitude === "number") {
+                console.log("[Geolocation] Resolved via ipwho.is:", data.latitude, data.longitude);
+                return { latitude: data.latitude, longitude: data.longitude };
+            }
+        }
+    } catch (e) {
+        console.warn("[Geolocation] ipwho.is failed, trying fallback:", e);
+    }
+
+    // 2nd attempt: freeipapi.com (CORS enabled)
+    try {
+        const res = await fetch("https://freeipapi.com/api/json", { signal: AbortSignal.timeout(4000) });
+        if (res.ok) {
+            const data = await res.json();
+            if (data && typeof data.latitude === "number" && typeof data.longitude === "number") {
+                console.log("[Geolocation] Resolved via freeipapi.com:", data.latitude, data.longitude);
+                return { latitude: data.latitude, longitude: data.longitude };
+            }
+        }
+    } catch (e) {
+        console.warn("[Geolocation] freeipapi.com failed:", e);
+    }
+
+    return null;
+};
+
 const getCurrentCoordinates = (): Promise<{ latitude: number; longitude: number } | null> => {
     return new Promise((resolve) => {
+        const attemptIpFallback = async () => {
+            console.log("[Geolocation] Browser GPS unavailable or timed out. Attempting IP-based network location fallback...");
+            const ipCoords = await fetchIpCoordinates();
+            if (ipCoords) {
+                resolve(ipCoords);
+            } else {
+                resolve(null);
+            }
+        };
+
         if (!navigator.geolocation) {
-            resolve(null);
+            attemptIpFallback();
             return;
         }
-        // Try High Accuracy first (with a short 3-second timeout)
+
+        // Try standard accuracy first (fastest for laptops/PCs via Wi-Fi/network positioning)
         navigator.geolocation.getCurrentPosition(
-            (position) => {
+            (pos) => {
                 resolve({
-                    latitude: position.coords.latitude,
-                    longitude: position.coords.longitude
+                    latitude: pos.coords.latitude,
+                    longitude: pos.coords.longitude
                 });
             },
-            (error) => {
-                console.warn("High accuracy geolocation failed, falling back to standard accuracy:", error.message);
-                // Fallback to standard accuracy (which resolves instantly on PCs/laptops via Wi-Fi/IP)
+            (standardErr) => {
+                console.warn("[Geolocation] Standard accuracy failed:", standardErr.code, standardErr.message);
+
+                // Try high accuracy before IP fallback
                 navigator.geolocation.getCurrentPosition(
-                    (fallbackPosition) => {
+                    (highPos) => {
                         resolve({
-                            latitude: fallbackPosition.coords.latitude,
-                            longitude: fallbackPosition.coords.longitude
+                            latitude: highPos.coords.latitude,
+                            longitude: highPos.coords.longitude
                         });
                     },
-                    (fallbackError) => {
-                        console.error("All geolocation attempts failed:", fallbackError.message);
-                        resolve(null);
+                    (highErr) => {
+                        console.warn("[Geolocation] High accuracy failed:", highErr.code, highErr.message);
+                        // Device GPS failed or unavailable on PC -> seamlessly fallback to IP location
+                        attemptIpFallback();
                     },
-                    { enableHighAccuracy: false, timeout: 5000, maximumAge: 0 }
+                    { enableHighAccuracy: true, timeout: 6000, maximumAge: 60000 }
                 );
             },
-            { enableHighAccuracy: true, timeout: 3000, maximumAge: 0 }
+            { enableHighAccuracy: false, timeout: 4000, maximumAge: 60000 }
         );
     });
 };
@@ -281,11 +333,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             setLoading(true);
             setError(null);
             const coords = await getCurrentCoordinates();
+            const device = getDeviceType();
             return handleAction(
                 () => attendanceService.clockIn({
                     latitude: coords?.latitude,
                     longitude: coords?.longitude,
-                    deviceInfo: navigator.userAgent
+                    deviceInfo: navigator.userAgent,
+                    device,
                 }),
                 "present",
                 "Failed to clock in."
@@ -296,11 +350,13 @@ export const AttendanceProvider: React.FC<{ children: React.ReactNode }> = ({ ch
             setLoading(true);
             setError(null);
             const coords = await getCurrentCoordinates();
+            const device = getDeviceType();
             return handleAction(
                 () => attendanceService.clockOut({
                     latitude: coords?.latitude,
                     longitude: coords?.longitude,
-                    deviceInfo: navigator.userAgent
+                    deviceInfo: navigator.userAgent,
+                    device,
                 }),
                 "clock_out",
                 "Failed to clock out."
