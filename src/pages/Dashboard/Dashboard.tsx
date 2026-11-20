@@ -18,6 +18,8 @@ import type { CustomAxiosConfig } from "../../services/api";
 
 
 import AnnouncementMarquee from "../../components/features/announcements/AnnouncementMarquee";
+import UpcomingBirthdaysCard from "../../components/features/birthdays/UpcomingBirthdaysCard";
+import BirthdayCelebrationModal from "../../components/features/birthdays/BirthdayCelebrationModal";
 
 
 
@@ -26,6 +28,7 @@ const Dashboard: React.FC = () => {
   const { refreshTrigger } = useAppSelector((state) => state.notification);
   const [isClockOutModalOpen, setIsClockOutModalOpen] = useState(false);
   const [isBreakModalOpen, setIsBreakModalOpen] = useState(false);
+  const [isBirthdayModalOpen, setIsBirthdayModalOpen] = useState(false);
   const [breakTypes, setBreakTypes] = useState<BreakType[]>([]);
   const [selectedBreakTypeId, setSelectedBreakTypeId] = useState<string>("");
   const [fetchingBreakTypes, setFetchingBreakTypes] = useState(false);
@@ -83,6 +86,35 @@ const Dashboard: React.FC = () => {
     },
     staleTime: 60000, // 1 minute
   });
+
+  // Fetch upcoming birthdays and check if today is current user's birthday
+  const {
+    data: birthdayData,
+    isLoading: birthdayLoading,
+  } = useQuery({
+    queryKey: ["upcoming-birthdays"],
+    queryFn: async () => {
+      const resp = await employeeService.getUpcomingBirthdays();
+      return resp.data;
+    },
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
+  // Automatically trigger confetti celebration modal if today is the user's birthday (first time of the day)
+  React.useEffect(() => {
+    if (!birthdayData || !user?.id) return;
+
+    if (birthdayData.isTodayMyBirthday) {
+      const todayDateKey = birthdayData.todayDate || new Date().toISOString().split("T")[0];
+      const storageKey = `bday_celebrated_${user.id}_${todayDateKey}`;
+      const hasSeenToday = localStorage.getItem(storageKey);
+
+      if (!hasSeenToday) {
+        setIsBirthdayModalOpen(true);
+        localStorage.setItem(storageKey, "true");
+      }
+    }
+  }, [birthdayData, user?.id]);
 
   const confirmOut = useCallback(async () => {
     setIsClockOutModalOpen(false);
@@ -218,17 +250,17 @@ const Dashboard: React.FC = () => {
         />
       </div>
 
-      {/* Main Content Grid */}
+      {/* Main Content Grid (3 equal columns: Recent Activity, Birthdays, Quick Summary) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
-        {/* Recent Activity */}
-        <div className="lg:col-span-2 bg-surface p-4 sm:p-6 rounded-2xl shadow-sm border border-border">
+        {/* 1. Recent Activity */}
+        <div className="bg-surface p-4 sm:p-6 rounded-2xl shadow-sm border border-border flex flex-col h-full">
           <div className="flex items-center justify-between mb-6">
             <h2 className="font-bold text-lg text-foreground">Recent Activity</h2>
             {/* <button className="text-sm text-primary font-medium hover:underline">
               View All
             </button> */}
           </div>
-          <div className="space-y-6 h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+          <div className="space-y-4 h-[300px] overflow-y-auto pr-2 custom-scrollbar">
             {activitiesLoading ? (
               <div className="flex flex-col items-center justify-center py-10 text-foreground-secondary">
                 <Loader2 className="w-8 h-8 animate-spin mb-2" />
@@ -236,11 +268,11 @@ const Dashboard: React.FC = () => {
               </div>
             ) : activities.length > 0 ? (
               activities.map((activity, idx) => (
-                <div key={idx} className="flex items-center gap-4 group">
+                <div key={idx} className="flex items-center gap-3 group">
                   <div className="relative">
                     <div
                       className={cn(
-                        "w-10 h-10 rounded-full flex items-center justify-center relative z-10 transition-transform group-hover:scale-110",
+                        "w-9 h-9 rounded-full flex items-center justify-center relative z-10 transition-transform group-hover:scale-110 shrink-0",
                         activity.type.includes("CLOCK_IN") || activity.type.includes("RESUME")
                           ? "bg-success/10 text-success"
                           : activity.type.includes("CLOCK_OUT") || activity.type.includes("REJECTED")
@@ -253,30 +285,30 @@ const Dashboard: React.FC = () => {
                       )}
                     >
                       {activity.type.includes("CLOCK") ? (
-                        <LogIn className="w-5 h-5" />
+                        <LogIn className="w-4 h-4" />
                       ) : activity.type.includes("REIMBURSEMENT") ? (
-                        <TrendingUp className="w-5 h-5" />
+                        <TrendingUp className="w-4 h-4" />
                       ) : activity.type.includes("ANNOUNCEMENT") ? (
-                        <Megaphone className="w-5 h-5" />
+                        <Megaphone className="w-4 h-4" />
                       ) : (
-                        <Coffee className="w-5 h-5" />
+                        <Coffee className="w-4 h-4" />
                       )}
                     </div>
                     {idx !== activities.length - 1 && (
-                      <div className="absolute top-10 left-1/2 w-0.5 h-6 bg-border -translate-x-1/2"></div>
+                      <div className="absolute top-9 left-1/2 w-0.5 h-6 bg-border -translate-x-1/2"></div>
                     )}
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-foreground">
+                      <span className="font-semibold text-xs sm:text-sm text-foreground truncate">
                         {activity.title}
                       </span>
-                      <span className="text-xs text-foreground-secondary bg-muted px-2 py-0.5 rounded-full font-medium">
+                      <span className="text-[10px] text-foreground-secondary bg-muted px-1.5 py-0.5 rounded-full font-medium shrink-0">
                         {formatTime(new Date(activity.timestamp))}
                       </span>
                     </div>
                     {activity.description && (
-                      <p className="text-sm text-foreground-secondary mt-0.5">
+                      <p className="text-xs text-foreground-secondary mt-0.5 truncate">
                         {activity.description}
                       </p>
                     )}
@@ -291,11 +323,19 @@ const Dashboard: React.FC = () => {
               </div>
             )}
           </div>
-
         </div>
 
-        {/* Quick Actions / Status */}
-        <div className="bg-surface p-4 sm:p-6 rounded-2xl shadow-sm border border-border">
+        {/* 2. Birthday Slider Section with Tabs */}
+        <UpcomingBirthdaysCard
+          todayBirthdays={birthdayData?.todayBirthdays || []}
+          upcomingBirthdays={birthdayData?.upcomingBirthdays || []}
+          isLoading={birthdayLoading}
+          isTodayMyBirthday={!!birthdayData?.isTodayMyBirthday}
+          onCelebrateMe={() => setIsBirthdayModalOpen(true)}
+        />
+
+        {/* 3. Quick Actions / Status */}
+        <div className="bg-surface p-4 sm:p-6 rounded-2xl shadow-sm border border-border flex flex-col h-full">
           <h2 className="font-bold text-lg text-foreground mb-6">
             Quick Summary
           </h2>
@@ -327,6 +367,13 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Birthday Celebration Confetti Modal */}
+      <BirthdayCelebrationModal
+        open={isBirthdayModalOpen}
+        onClose={() => setIsBirthdayModalOpen(false)}
+        userName={user?.firstName || "Colleague"}
+      />
 
       {/* Clock Out Confirmation Modal */}
       <Modal
