@@ -35,6 +35,7 @@ export interface OfficeLocation {
     };
     isHeadquarters: boolean;
     isActive: boolean;
+    leaveNotificationEmails?: string[];
 }
 
 export interface OfficeLocation {
@@ -53,6 +54,7 @@ export interface OfficeLocation {
     };
     isHeadquarters: boolean;
     isActive: boolean;
+    leaveNotificationEmails?: string[];
 }
 
 export interface OrganizationResponse<T> {
